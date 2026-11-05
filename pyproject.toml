@@ -1,0 +1,136 @@
+[project]
+name = "chesscom-fetch"
+version = "0.1.0"
+description = "Download a player's Chess.com games into a local SQLite database, fetching only new ones."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Matthew Hurley", email = "matthew.hurley953@gmail.com" }
+]
+keywords = ["chess", "chess.com", "cli", "sqlite"]
+requires-python = ">=3.14"
+dependencies = [
+    "httpx2>=2.16.0",
+    "pydantic>=2.14.3",
+    "typer>=0.27.3",
+]
+
+[project.urls]
+Repository = "https://github.com/Murfew/chesscom-fetch"
+
+[project.scripts]
+chesscom-fetch = "chesscom_fetch.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.24,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+# ─── Ruff ────────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+# target-version is inferred from requires-python
+
+[tool.ruff.lint]
+select = [
+    "D",     # pydocstyle: for docstring linting
+    "DOC",   # pydoclint: check that docstring matches function
+    "E",     # pycodestyle: PEP 8 basics every reviewer expects
+    "W",     # pycodestyle: PEP 8 basics every reviewer expects (incl. W505 doc length)
+    "F",     # pyflakes: real mistakes like unused imports and undefined names
+    "I",     # isort: consistent import order, no merge-conflict churn
+    "N",     # pep8-naming: snake_case/PascalCase so names read as Python
+    "UP",    # pyupgrade: modern syntax (list[int], X | None) for my Python version
+    "B",     # bugbear: likely bugs like mutable default arguments
+    "A",     # builtins: don't shadow list, id, type, input...
+    "C4",    # comprehensions: cleaner, faster list/dict/set building
+    "SIM",   # simplify: more Pythonic idioms in place of clunky if/else
+    "RET",   # return: no else after return, no pointless temp variables
+    "PIE",   # misc: removes dead or unnecessary code
+    "PTH",   # pathlib: Path over os.path, the modern standard
+    "PERF",  # performance: catches slow loop patterns
+    "FURB",  # refurb: modern stdlib idioms
+    "ARG",   # unused arguments: often a leftover or a bug
+    "DTZ",   # datetimez: no naive datetimes; game end dates and fetched_at must compare correctly
+    "S",     # bandit: security, e.g. SQL built with f-strings (use ? placeholders), HTTP calls without a timeout
+    "BLE",   # blind except: no bare `except Exception` swallowing errors
+    "T20",   # print: user output goes through Typer, debugging through logging
+    "LOG",   # logging: correct logger usage
+    "G",     # logging format: lazy %-args, not f-strings in log calls
+    "ERA",   # commented-out code: git keeps history, so delete it
+    "TRY",   # exceptions: narrow try blocks, proper raising and logging
+    "PGH",   # pygrep: no blanket `# type: ignore` / `# noqa`
+    "PT",    # pytest style: fixtures, raises, parametrize done right
+    "ASYNC", # async pitfalls: blocking calls in async code (for later services)
+    "FAST",  # FastAPI rules: unused here, ready for the coach
+    "PL",    # pylint subset: code smells like magic numbers and too many branches
+    "RUF",   # Ruff's own rules, including stale noqa comments
+]
+ignore = [
+    "undocumented-public-module",                # D100: file name says what the module is; app, not a library
+    "undocumented-public-package",               # D104: same for __init__.py
+    "line-too-long",                             # code lines: ruff format wraps them; docstrings/comments are checked by W505 instead
+    "raise-vanilla-args",                        # long exception messages: custom classes for each is overkill
+    "too-many-arguments",                        # too many arguments: noisy with Typer options and DI
+    "missing-trailing-comma",                    # conflict with ruff format, per Ruff's own docs
+    "single-line-implicit-string-concatenation", # conflict with ruff format, per Ruff's own docs
+]
+preview = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "assert",                 # pytest is built on assert
+    "magic-value-comparison", # magic numbers are normal in expected values
+    "ARG",                    # fixtures look like unused arguments
+    "D",                      # test functions don't need docstrings
+    "no-self-use",            # pytest test classes are just grouping; methods never use self
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pydoclint]
+ignore-one-line-docstrings = true # private helpers get one line; full Google-style sections are for the public API
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 88 # W505: flag docstring and comment lines the formatter won't wrap
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# ─── mypy ────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unreachable = true
+enable_error_code = [
+    "ignore-without-code",
+    "redundant-expr",
+    "truthy-bool",
+    "possibly-undefined",
+    "explicit-override",
+]
+
+
+# ─── pytest ──────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "-ra",               # summary of skips/xfails/errors at the end
+    "--strict-markers",  # typo'd @pytest.mark.x is an error, not a silent no-op
+    "--strict-config",   # typo'd config key is an error
+    "--import-mode=importlib",
+]
+xfail_strict = true          # an xfail that starts passing fails the run
+filterwarnings = ["error"]   # warnings (e.g. deprecations) fail tests
