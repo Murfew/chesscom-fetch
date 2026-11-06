@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 
 import chesscom_fetch.cli
 from chesscom_fetch import db
+from chesscom_fetch.models import Game
 
 
 @pytest.fixture(autouse=True)
@@ -35,3 +36,12 @@ def setup_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
+
+
+@pytest.fixture
+def fake_game() -> Game:
+    json_str = (Path(__file__).resolve().parent / Path("./fake_game.json")).read_text(
+        encoding="utf-8"
+    )
+
+    return Game.model_validate_json(json_str)
