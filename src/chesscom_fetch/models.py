@@ -10,6 +10,7 @@ from pydantic import (
     Field,
     HttpUrl,
     NonNegativeInt,
+    StringConstraints,
     model_validator,
 )
 
@@ -134,7 +135,7 @@ class Player(BaseModel):
     rating: NonNegativeInt = Field(le=MAX_RATING)
     result: APIResult
     id: HttpUrl = Field(alias="@id")
-    username: str
+    username: Annotated[str, StringConstraints(to_lower=True, strip_whitespace=True)]
     uuid: UUID
 
 
