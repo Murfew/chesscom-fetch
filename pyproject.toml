@@ -11,6 +11,7 @@ authors = [
 keywords = ["chess", "chess.com", "cli", "sqlite"]
 requires-python = ">=3.14"
 dependencies = [
+    "chess>=1.11.2",
     "httpx2>=2.16.0",
     "pydantic>=2.14.3",
     "typer>=0.27.3",
@@ -133,4 +134,7 @@ addopts = [
     "--import-mode=importlib",
 ]
 xfail_strict = true          # an xfail that starts passing fails the run
-filterwarnings = ["error"]   # warnings (e.g. deprecations) fail tests
+filterwarnings = [
+    "error", # warnings (e.g. deprecations) fail tests
+    "ignore:.*(asyncio|event loop).*:DeprecationWarning:chess.*" # python-chess uses a deprecated asyncio API; not our code
+]
