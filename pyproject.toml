@@ -79,6 +79,7 @@ select = [
 ignore = [
     "undocumented-public-module",                # D100: file name says what the module is; app, not a library
     "undocumented-public-package",               # D104: same for __init__.py
+    "undocumented-public-init",                  # D107: constructor args are documented in the class docstring (Google style)
     "line-too-long",                             # code lines: ruff format wraps them; docstrings/comments are checked by W505 instead
     "raise-vanilla-args",                        # long exception messages: custom classes for each is overkill
     "too-many-arguments",                        # too many arguments: noisy with Typer options and DI
