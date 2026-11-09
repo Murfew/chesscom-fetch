@@ -11,6 +11,7 @@ from chesscom_fetch.models import ArchiveList, ArchiveMonth
 
 DEFAULT_RETRY_WAIT_TIME_SECONDS = 5
 MAX_RETRY_WAIT_TIME_SECONDS = 30
+USER_AGENT = "chesscom-fetch (matthew.hurley953@gmail.com)"
 
 
 class ChessFetcherError(Exception):
@@ -155,9 +156,7 @@ class HttpClient:
         self.username = username
         self.wait = wait
 
-        self.client.headers.update(
-            {"User-Agent": "chesscom-fetch (matthew.hurley953@gmail.com)"}
-        )
+        self.client.headers.update({"user-agent": USER_AGENT})
         self.client.base_url = f"https://api.chess.com/pub/player/{self.username}/games"
 
     def _get_once(

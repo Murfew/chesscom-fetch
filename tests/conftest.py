@@ -1,12 +1,17 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
+import httpx2
 import pytest
+from pytest_mock import MockFixture
 from rich.console import Console
 from typer.testing import CliRunner
 
 import chesscom_fetch.cli
 from chesscom_fetch import db
+from chesscom_fetch.http import HttpClient
 from chesscom_fetch.models import Game
+from tests.helpers import Handler, MakeHttpClient
 
 
 @pytest.fixture(autouse=True)
@@ -45,3 +50,17 @@ def fake_game() -> Game:
     )
 
     return Game.model_validate_json(json_str)
+
+
+@pytest.fixture
+def make_http_client(mocker: MockFixture) -> MakeHttpClient:
+    def _make_http_client(
+        handler: Handler, wait_mock: MagicMock | None = None
+    ) -> HttpClient:
+        return HttpClient(
+            httpx2.Client(transport=httpx2.MockTransport(handler)),
+            "test-player",
+            wait_mock if wait_mock is not None else mocker.MagicMock(),
+        )
+
+    return _make_http_client
