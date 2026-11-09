@@ -3,8 +3,16 @@ import time
 from collections.abc import Callable, Mapping
 from typing import override
 
-import httpx2
-from httpx2 import URL
+from httpx2 import (
+    URL,
+    Client,
+    Headers,
+    HTTPStatusError,
+    RequestError,
+    Response,
+    TimeoutException,
+    codes,
+)
 from pydantic import BaseModel, ValidationError
 
 from chesscom_fetch.models import ArchiveList, ArchiveMonth
@@ -45,7 +53,7 @@ class InvalidResponseError(ChessFetcherError):
         self.detail = detail
         super().__init__(
             f"Response from {url} didn't match the expected format: {detail}",
-            error_code=httpx2.codes.BAD_GATEWAY,
+            error_code=codes.BAD_GATEWAY,
             url=url,
         )
 
@@ -56,7 +64,7 @@ class FetchTimeoutError(ChessFetcherError):
     def __init__(self, url: URL) -> None:
         super().__init__(
             f"Request to {url} timed out.",
-            error_code=httpx2.codes.GATEWAY_TIMEOUT,
+            error_code=codes.GATEWAY_TIMEOUT,
             url=url,
         )
 
@@ -68,7 +76,7 @@ class PlayerNotFoundError(ChessFetcherError):
         self.username = username
         super().__init__(
             f"No data found for '{username}'. Check the username or archive month.",
-            error_code=httpx2.codes.NOT_FOUND,
+            error_code=codes.NOT_FOUND,
         )
 
 
@@ -81,7 +89,7 @@ class RateLimitExhaustedError(ChessFetcherError):
         plural = "" if attempts == 1 else "s"
         super().__init__(
             f"Rate limited by {host}; gave up after {attempts} attempt{plural}.",
-            error_code=httpx2.codes.TOO_MANY_REQUESTS,
+            error_code=codes.TOO_MANY_REQUESTS,
         )
 
 
@@ -92,11 +100,11 @@ class ChessNetworkError(ChessFetcherError):
         self.host = host
         super().__init__(
             f"Couldn't reach {host}. Check your connection and try again.",
-            error_code=httpx2.codes.BAD_GATEWAY,
+            error_code=codes.BAD_GATEWAY,
         )
 
 
-def _retry_after_seconds(headers: httpx2.Headers) -> float:
+def _retry_after_seconds(headers: Headers) -> float:
     """Return how many seconds to wait before retrying a 429.
 
     Reads the Retry-After header as a number of seconds. Falls back to the
@@ -125,9 +133,7 @@ def _retry_after_seconds(headers: httpx2.Headers) -> float:
     return time_to_wait
 
 
-def _validate_response_format[T: BaseModel](
-    response: httpx2.Response, model: type[T]
-) -> T:
+def _validate_response_format[T: BaseModel](response: Response, model: type[T]) -> T:
     try:
         return model.model_validate_json(response.text)
     except ValidationError as err:
@@ -148,7 +154,7 @@ class HttpClient:
 
     def __init__(
         self,
-        client: httpx2.Client,
+        client: Client,
         username: str,
         wait: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -159,9 +165,7 @@ class HttpClient:
         self.client.headers.update({"user-agent": USER_AGENT})
         self.client.base_url = f"https://api.chess.com/pub/player/{self.username}/games"
 
-    def _get_once(
-        self, url: str, headers: Mapping[str, str] | None = None
-    ) -> httpx2.Response:
+    def _get_once(self, url: str, headers: Mapping[str, str] | None = None) -> Response:
         """Send one GET request, turning network failures into fetcher errors.
 
         Args:
@@ -177,16 +181,16 @@ class HttpClient:
         """
         try:
             return self.client.get(url, headers=headers)
-        except httpx2.TimeoutException as err:
+        except TimeoutException as err:
             raise FetchTimeoutError(
                 err.request.url,
             ) from err
-        except httpx2.RequestError as err:
+        except RequestError as err:
             raise ChessNetworkError(err.request.url.host) from err
 
     def _get_with_retry(
         self, url: str, headers: dict[str, str] | None = None
-    ) -> httpx2.Response:
+    ) -> Response:
         """Send a GET request, retrying once if Chess.com answers 429.
 
         Waits for the time given in Retry-After, or the default wait if that header is
@@ -201,17 +205,17 @@ class HttpClient:
 
         Raises:
             RateLimitExhaustedError: Chess.com still answered 429 after the retry.
-            httpx2.HTTPStatusError: Any other error status, for the caller to interpret.
+            HTTPStatusError: Any other error status, for the caller to interpret.
         """
         response = self._get_once(url, headers)
-        if response.status_code == httpx2.codes.TOO_MANY_REQUESTS:
+        if response.status_code == codes.TOO_MANY_REQUESTS:
             self.wait(_retry_after_seconds(response.headers))
             response = self._get_once(url, headers)
 
         try:
             response.raise_for_status()
-        except httpx2.HTTPStatusError as err:
-            if err.response.status_code == httpx2.codes.TOO_MANY_REQUESTS:
+        except HTTPStatusError as err:
+            if err.response.status_code == codes.TOO_MANY_REQUESTS:
                 raise RateLimitExhaustedError(err.response.url.host) from err
 
             raise
@@ -231,8 +235,8 @@ class HttpClient:
         try:
             response = self._get_with_retry("/archives")
 
-        except httpx2.HTTPStatusError as err:
-            if err.response.status_code == httpx2.codes.NOT_FOUND:
+        except HTTPStatusError as err:
+            if err.response.status_code == codes.NOT_FOUND:
                 raise PlayerNotFoundError(self.username) from err
 
             raise ChessFetcherError(
@@ -261,8 +265,8 @@ class HttpClient:
             response = self._get_with_retry(
                 url, {"if-none-match": etag} if etag else None
             )
-        except httpx2.HTTPStatusError as err:
-            if err.response.status_code == httpx2.codes.NOT_MODIFIED:
+        except HTTPStatusError as err:
+            if err.response.status_code == codes.NOT_MODIFIED:
                 return None
 
             raise ChessFetcherError(
