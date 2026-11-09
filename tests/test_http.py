@@ -1,51 +1,60 @@
+import re
 from typing import ClassVar
 
-import httpx2
+import pytest
+from httpx2 import Headers, Request, Response, codes
+from pytest_mock import MockerFixture
 
-from chesscom_fetch.http import USER_AGENT
-from tests.helpers import MakeHttpClient
+from chesscom_fetch.http import (
+    DEFAULT_RETRY_WAIT_TIME_SECONDS,
+    MAX_RETRY_WAIT_TIME_SECONDS,
+    USER_AGENT,
+    ChessFetcherError,
+    PlayerNotFoundError,
+    RateLimitExhaustedError,
+    _retry_after_seconds,
+)
+from chesscom_fetch.models import Game
+from tests.helpers import TEST_USERNAME, MakeHttpClient, build_429_response
 
-TEST_USERNAME = "test-player"
+URLS = [
+    f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/01",
+    f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/02",
+    f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/03",
+]
+
+ARCHIVE_LIST_URL = f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/archives"
 
 
 class TestGetArchiveList:
-    URLS: ClassVar[list[str]] = [
-        f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/01",
-        f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/02",
-        f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/03",
-    ]
-
     def test_returns_archives(
         self,
         make_http_client: MakeHttpClient,
     ) -> None:
-        def handler(request: httpx2.Request) -> httpx2.Response:
-            assert (
-                request.url
-                == f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/archives"
-            )
+        def handler(request: Request) -> Response:
+            assert request.url == ARCHIVE_LIST_URL
 
-            return httpx2.Response(
-                httpx2.codes.OK,
-                json={"archives": self.URLS},
+            return Response(
+                codes.OK,
+                json={"archives": URLS},
             )
 
         client = make_http_client(handler)
         archive_list = client.get_archive_list()
 
-        assert [str(url) for url in archive_list.archives] == self.URLS
+        assert [str(url) for url in archive_list.archives] == URLS
 
     def test_sends_user_agent(
         self,
         make_http_client: MakeHttpClient,
     ) -> None:
-        def handler(request: httpx2.Request) -> httpx2.Response:
+        def handler(request: Request) -> Response:
 
             assert request.headers.get("user-agent") == USER_AGENT
 
-            return httpx2.Response(
-                httpx2.codes.OK,
-                json={"archives": self.URLS},
+            return Response(
+                codes.OK,
+                json={"archives": URLS},
             )
 
         client = make_http_client(handler)
@@ -54,15 +63,149 @@ class TestGetArchiveList:
     def test_raises_player_not_found_on_404(
         self,
         make_http_client: MakeHttpClient,
-    ) -> None: ...
+    ) -> None:
+        def handler(request: Request) -> Response:
+            return Response(status_code=codes.NOT_FOUND)
+
+        client = make_http_client(handler)
+        with pytest.raises(
+            PlayerNotFoundError,
+            match=re.escape(f"[404] No data found for '{TEST_USERNAME}'."),
+        ):
+            client.get_archive_list()
+
     def test_includes_url_and_status_on_unexpected_error(
         self,
         make_http_client: MakeHttpClient,
-    ) -> None: ...
+    ) -> None:
+        def handler(request: Request) -> Response:
+            return Response(status_code=codes.INTERNAL_SERVER_ERROR)
+
+        client = make_http_client(handler)
+        with pytest.raises(
+            ChessFetcherError,
+            match=re.escape(f"[500] Unexpected response from {ARCHIVE_LIST_URL}."),
+        ):
+            client.get_archive_list()
 
 
-def test_get_with_retry_retries_once_after_429() -> None: ...
-def test_get_with_retry_gives_up_after_second_429() -> None: ...
-def test_get_archive_month_sends_if_none_match() -> None: ...
-def test_get_archive_month_returns_none_on_304() -> None: ...
-def test_retry_after_seconds_falls_back_on_bad_values() -> None: ...
+class TestGetWithRetry:
+    RETRY_AFTER: ClassVar[int] = 10
+
+    def test_retries_once_after_429(
+        self, make_http_client: MakeHttpClient, mocker: MockerFixture
+    ) -> None:
+        requests: list[Request] = []
+        responses = iter(
+            [
+                build_429_response(self.RETRY_AFTER),
+                Response(status_code=codes.OK, json={"archives": URLS}),
+            ]
+        )
+
+        def handler(request: Request) -> Response:
+            requests.append(request)
+            return next(responses)
+
+        wait_mock = mocker.MagicMock()
+        client = make_http_client(handler, wait_mock)
+        client.get_archive_list()
+
+        wait_mock.assert_called_once_with(self.RETRY_AFTER)
+        assert len(requests) == 2
+
+    def test_gives_up_after_second_429(
+        self, make_http_client: MakeHttpClient, mocker: MockerFixture
+    ) -> None:
+        requests: list[Request] = []
+        responses = iter(
+            [
+                build_429_response(self.RETRY_AFTER),
+                build_429_response(self.RETRY_AFTER),
+                Response(status_code=codes.OK, json={"archives": URLS}),
+            ]
+        )
+
+        def handler(request: Request) -> Response:
+            requests.append(request)
+            return next(responses)
+
+        wait_mock = mocker.MagicMock()
+        client = make_http_client(handler, wait_mock)
+
+        with pytest.raises(RateLimitExhaustedError):
+            client.get_archive_list()
+
+        wait_mock.assert_called_once_with(self.RETRY_AFTER)
+        assert len(requests) == 2
+
+
+class TestGetArchiveMonth:
+    def test_sends_if_none_match(
+        self, make_http_client: MakeHttpClient, fake_game: Game
+    ) -> None:
+        etag = '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+
+        def handler(request: Request) -> Response:
+            assert request.headers.get("if-none-match") == etag
+
+            return Response(
+                status_code=codes.OK,
+                json={"games": [fake_game.model_dump(mode="json", by_alias=True)]},
+            )
+
+        client = make_http_client(handler)
+        client.get_archive_month(URLS[0], etag)
+
+    def test_returns_none_on_304(self, make_http_client: MakeHttpClient) -> None:
+        def handler(request: Request) -> Response:
+            return Response(
+                status_code=codes.NOT_MODIFIED,
+            )
+
+        client = make_http_client(handler)
+        assert client.get_archive_month(URLS[0]) is None
+
+
+class TestRetryAfterSeconds:
+    @pytest.mark.parametrize(
+        ("header_value", "expected_seconds"),
+        [
+            pytest.param("10", 10, id="normal number"),
+            pytest.param(
+                str(MAX_RETRY_WAIT_TIME_SECONDS),
+                MAX_RETRY_WAIT_TIME_SECONDS,
+                id="exactly the maximum",
+            ),
+            pytest.param(
+                str(MAX_RETRY_WAIT_TIME_SECONDS + 1),
+                DEFAULT_RETRY_WAIT_TIME_SECONDS,
+                id="just over the maximum",
+            ),
+            pytest.param("-1", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="negative number"),
+            pytest.param("nan", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="nan"),
+            pytest.param("inf", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="inf"),
+            pytest.param(
+                "Mon, 09 Nov 2026 16:26:00 GMT",
+                DEFAULT_RETRY_WAIT_TIME_SECONDS,
+                id="HTTP date",
+            ),
+            pytest.param(
+                "sadasdasdafadfsd",
+                DEFAULT_RETRY_WAIT_TIME_SECONDS,
+                id="nonsense string",
+            ),
+            pytest.param(None, DEFAULT_RETRY_WAIT_TIME_SECONDS, id="empty header"),
+        ],
+    )
+    def test_parses_or_falls_back(
+        self, header_value: str | None, expected_seconds: float
+    ) -> None:
+        assert (
+            _retry_after_seconds(
+                Headers({"retry-after": header_value})
+                if header_value is not None
+                else Headers()
+            )
+            == expected_seconds
+        )

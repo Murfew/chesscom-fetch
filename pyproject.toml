@@ -96,6 +96,7 @@ preview = true
     "ARG",                    # fixtures look like unused arguments
     "D",                      # test functions don't need docstrings
     "no-self-use",            # pytest test classes are just grouping; methods never use self
+    "import-private-name",    # PLC2701: tests call pure private helpers directly
 ]
 
 [tool.ruff.lint.pydocstyle]
