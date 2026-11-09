@@ -15,38 +15,40 @@ from chesscom_fetch.http import (
     _retry_after_seconds,
 )
 from chesscom_fetch.models import Game
-from tests.helpers import TEST_USERNAME, MakeHttpClient, build_429_response
+from tests.helpers import (
+    TEST_ARCHIVE_MONTH_URLS,
+    TEST_ETAG,
+    TEST_USERNAME_WHITE,
+    MakeChessClient,
+    build_429_response,
+)
 
-URLS = [
-    f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/01",
-    f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/02",
-    f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/2026/03",
-]
-
-ARCHIVE_LIST_URL = f"https://api.chess.com/pub/player/{TEST_USERNAME}/games/archives"
+ARCHIVE_LIST_URL = (
+    f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/archives"
+)
 
 
 class TestGetArchiveList:
     def test_returns_archives(
         self,
-        make_http_client: MakeHttpClient,
+        make_http_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
             assert request.url == ARCHIVE_LIST_URL
 
             return Response(
                 codes.OK,
-                json={"archives": URLS},
+                json={"archives": TEST_ARCHIVE_MONTH_URLS},
             )
 
         client = make_http_client(handler)
         archive_list = client.get_archive_list()
 
-        assert [str(url) for url in archive_list.archives] == URLS
+        assert [str(url) for url in archive_list.archives] == TEST_ARCHIVE_MONTH_URLS
 
     def test_sends_user_agent(
         self,
-        make_http_client: MakeHttpClient,
+        make_http_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
 
@@ -54,7 +56,7 @@ class TestGetArchiveList:
 
             return Response(
                 codes.OK,
-                json={"archives": URLS},
+                json={"archives": TEST_ARCHIVE_MONTH_URLS},
             )
 
         client = make_http_client(handler)
@@ -62,7 +64,7 @@ class TestGetArchiveList:
 
     def test_raises_player_not_found_on_404(
         self,
-        make_http_client: MakeHttpClient,
+        make_http_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
             return Response(status_code=codes.NOT_FOUND)
@@ -70,13 +72,13 @@ class TestGetArchiveList:
         client = make_http_client(handler)
         with pytest.raises(
             PlayerNotFoundError,
-            match=re.escape(f"[404] No data found for '{TEST_USERNAME}'."),
+            match=re.escape(f"[404] No data found for '{TEST_USERNAME_WHITE}'."),
         ):
             client.get_archive_list()
 
     def test_includes_url_and_status_on_unexpected_error(
         self,
-        make_http_client: MakeHttpClient,
+        make_http_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
             return Response(status_code=codes.INTERNAL_SERVER_ERROR)
@@ -93,13 +95,15 @@ class TestGetWithRetry:
     RETRY_AFTER: ClassVar[int] = 10
 
     def test_retries_once_after_429(
-        self, make_http_client: MakeHttpClient, mocker: MockerFixture
+        self, make_http_client: MakeChessClient, mocker: MockerFixture
     ) -> None:
         requests: list[Request] = []
         responses = iter(
             [
                 build_429_response(self.RETRY_AFTER),
-                Response(status_code=codes.OK, json={"archives": URLS}),
+                Response(
+                    status_code=codes.OK, json={"archives": TEST_ARCHIVE_MONTH_URLS}
+                ),
             ]
         )
 
@@ -115,14 +119,16 @@ class TestGetWithRetry:
         assert len(requests) == 2
 
     def test_gives_up_after_second_429(
-        self, make_http_client: MakeHttpClient, mocker: MockerFixture
+        self, make_http_client: MakeChessClient, mocker: MockerFixture
     ) -> None:
         requests: list[Request] = []
         responses = iter(
             [
                 build_429_response(self.RETRY_AFTER),
                 build_429_response(self.RETRY_AFTER),
-                Response(status_code=codes.OK, json={"archives": URLS}),
+                Response(
+                    status_code=codes.OK, json={"archives": TEST_ARCHIVE_MONTH_URLS}
+                ),
             ]
         )
 
@@ -142,12 +148,11 @@ class TestGetWithRetry:
 
 class TestGetArchiveMonth:
     def test_sends_if_none_match(
-        self, make_http_client: MakeHttpClient, fake_game: Game
+        self, make_http_client: MakeChessClient, fake_game: Game
     ) -> None:
-        etag = '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
 
         def handler(request: Request) -> Response:
-            assert request.headers.get("if-none-match") == etag
+            assert request.headers.get("if-none-match") == TEST_ETAG
 
             return Response(
                 status_code=codes.OK,
@@ -155,16 +160,16 @@ class TestGetArchiveMonth:
             )
 
         client = make_http_client(handler)
-        client.get_archive_month(URLS[0], etag)
+        client.get_archive_month(TEST_ARCHIVE_MONTH_URLS[0], TEST_ETAG)
 
-    def test_returns_none_on_304(self, make_http_client: MakeHttpClient) -> None:
+    def test_returns_none_on_304(self, make_http_client: MakeChessClient) -> None:
         def handler(request: Request) -> Response:
             return Response(
                 status_code=codes.NOT_MODIFIED,
             )
 
         client = make_http_client(handler)
-        assert client.get_archive_month(URLS[0]) is None
+        assert client.get_archive_month(TEST_ARCHIVE_MONTH_URLS[0]) is None
 
 
 class TestRetryAfterSeconds:

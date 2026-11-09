@@ -9,9 +9,10 @@ from typer.testing import CliRunner
 
 import chesscom_fetch.cli
 from chesscom_fetch import db
-from chesscom_fetch.http import HttpClient
-from chesscom_fetch.models import Game
-from tests.helpers import TEST_USERNAME, Handler, MakeHttpClient
+from chesscom_fetch.converter import game_to_game_row
+from chesscom_fetch.http import ChessClient
+from chesscom_fetch.models import Game, GameRow
+from tests.helpers import TEST_FETCH_DATE, TEST_USERNAME_WHITE, Handler, MakeChessClient
 
 
 @pytest.fixture(autouse=True)
@@ -53,13 +54,18 @@ def fake_game() -> Game:
 
 
 @pytest.fixture
-def make_http_client(mocker: MockFixture) -> MakeHttpClient:
+def fake_game_row(fake_game: Game) -> GameRow:
+    return game_to_game_row(TEST_USERNAME_WHITE, fake_game, TEST_FETCH_DATE)
+
+
+@pytest.fixture
+def make_http_client(mocker: MockFixture) -> MakeChessClient:
     def _make_http_client(
         handler: Handler, wait_mock: MagicMock | None = None
-    ) -> HttpClient:
-        return HttpClient(
+    ) -> ChessClient:
+        return ChessClient(
             Client(transport=MockTransport(handler)),
-            TEST_USERNAME,
+            TEST_USERNAME_WHITE,
             wait_mock if wait_mock is not None else mocker.MagicMock(),
         )
 

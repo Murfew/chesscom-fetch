@@ -140,7 +140,7 @@ def _validate_response_format[T: BaseModel](response: Response, model: type[T]) 
         raise InvalidResponseError(response.url, err.errors()[0]["msg"]) from err
 
 
-class HttpClient:
+class ChessClient:
     """Fetch Chess.com archive data for one player, one request at a time.
 
     Wraps an injected httpx client so tests can swap in a fake transport.
