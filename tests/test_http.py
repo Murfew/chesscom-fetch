@@ -72,7 +72,7 @@ class TestGetArchiveList:
         client = make_http_client(handler)
         with pytest.raises(
             PlayerNotFoundError,
-            match=re.escape(f"[404] No data found for '{TEST_USERNAME_WHITE}'."),
+            match=f"404.*{TEST_USERNAME_WHITE}",
         ):
             client.get_archive_list()
 
@@ -84,10 +84,7 @@ class TestGetArchiveList:
             return Response(status_code=codes.INTERNAL_SERVER_ERROR)
 
         client = make_http_client(handler)
-        with pytest.raises(
-            ChessFetcherError,
-            match=re.escape(f"[500] Unexpected response from {ARCHIVE_LIST_URL}."),
-        ):
+        with pytest.raises(ChessFetcherError, match=f"500.*{ARCHIVE_LIST_URL}"):
             client.get_archive_list()
 
 

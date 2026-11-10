@@ -52,7 +52,7 @@ class InvalidResponseError(ChessFetcherError):
     def __init__(self, url: URL, detail: str) -> None:
         self.detail = detail
         super().__init__(
-            f"Response from {url} didn't match the expected format: {detail}",
+            f"Unexpected data from {url}: {detail}.",
             error_code=codes.BAD_GATEWAY,
             url=url,
         )
@@ -63,7 +63,7 @@ class FetchTimeoutError(ChessFetcherError):
 
     def __init__(self, url: URL) -> None:
         super().__init__(
-            f"Request to {url} timed out.",
+            f"Request to {url} timed out. Try again later.",
             error_code=codes.GATEWAY_TIMEOUT,
             url=url,
         )
@@ -75,7 +75,7 @@ class PlayerNotFoundError(ChessFetcherError):
     def __init__(self, username: str) -> None:
         self.username = username
         super().__init__(
-            f"No data found for '{username}'. Check the username or archive month.",
+            f"Player '{username}' not found on Chess.com. Check the spelling.",
             error_code=codes.NOT_FOUND,
         )
 
@@ -83,12 +83,10 @@ class PlayerNotFoundError(ChessFetcherError):
 class RateLimitExhaustedError(ChessFetcherError):
     """Raised when Chess.com still answers 429 after retrying."""
 
-    def __init__(self, host: str, attempts: int = 1) -> None:
+    def __init__(self, host: str) -> None:
         self.host = host
-        self.attempts = attempts
-        plural = "" if attempts == 1 else "s"
         super().__init__(
-            f"Rate limited by {host}; gave up after {attempts} attempt{plural}.",
+            "Chess.com is still rate limiting after a retry. Try again in a few minutes.",
             error_code=codes.TOO_MANY_REQUESTS,
         )
 
