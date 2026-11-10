@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
+from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import (
@@ -10,6 +11,7 @@ from pydantic import (
     Field,
     HttpUrl,
     NonNegativeInt,
+    PositiveInt,
     StringConstraints,
     model_validator,
 )
@@ -139,10 +141,56 @@ class Player(BaseModel):
     uuid: UUID
 
 
+class Archive(BaseModel):
+    """One month in a player's archive list, parsed from its URL.
+
+    Chess.com sends each archive as a URL ending in /YYYY/MM. The year and
+    month are read from it so callers don't have to parse URLs themselves.
+    """
+
+    url: str
+    year: NonNegativeInt
+    month: PositiveInt = Field(le=12)
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_url(cls, data: Any) -> dict[str, str | int]:
+        """Turn the raw archive URL into url, year and month fields.
+
+        Accepts the URL string Chess.com sends, or a dict with a "url" key
+        (as when the model is built with keyword arguments). Year and month
+        are always read from the URL so the three fields can't disagree.
+
+        Returns:
+            The url, year and month for normal field validation to check.
+
+        Raises:
+            ValueError: The input isn't a string or dict, has no url, or the
+                URL doesn't end in a numeric /YYYY/MM.
+        """
+        if isinstance(data, dict):
+            if "url" not in data:
+                raise ValueError("'url' should be included")
+
+            url = str(data["url"])
+        elif isinstance(data, str):
+            url = data
+        else:
+            raise ValueError("'data' must be either a dict or a string.")  # ruff: ignore[type-check-without-type-error]: Pydantic only converts ValueError into ValidationError
+
+        parsed = urlparse(url)
+        try:
+            year, month = [int(value) for value in parsed.path.split("/")[-2:]]
+        except ValueError as err:
+            raise ValueError("archive URL must end in /YYYY/MM") from err
+
+        return {"url": url, "year": year, "month": month}
+
+
 class ArchiveList(BaseModel):
     """Response from the archives endpoint: one URL per month the player has games."""
 
-    archives: list[HttpUrl]
+    archives: list[Archive]
 
 
 class ArchiveMonth(BaseModel):

@@ -16,6 +16,7 @@ from chesscom_fetch.http import (
 from chesscom_fetch.models import Game
 from tests.helpers import (
     TEST_ARCHIVE_MONTH_URLS,
+    TEST_ARCHIVES,
     TEST_ETAG,
     TEST_USERNAME_WHITE,
     MakeChessClient,
@@ -43,7 +44,7 @@ class TestGetArchiveList:
         client = make_http_client(handler)
         archive_list = client.get_archive_list()
 
-        assert [str(url) for url in archive_list.archives] == TEST_ARCHIVE_MONTH_URLS
+        assert archive_list.archives == TEST_ARCHIVES
 
     def test_sends_user_agent(
         self,
