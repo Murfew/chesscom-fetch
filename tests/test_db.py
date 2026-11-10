@@ -1,20 +1,34 @@
 from pathlib import Path
-from typing import ClassVar
+from sqlite3 import IntegrityError
+from typing import ClassVar, NoReturn
 
 import pytest
 
 from chesscom_fetch import db
-from chesscom_fetch.models import GameRow
+from chesscom_fetch.models import Colour, GameRow, Result, TimeClass
 from tests.helpers import (
     TEST_ARCHIVE_MONTH_URLS,
     TEST_ETAG,
     TEST_USERNAME_BLACK,
 )
 
+VALID_ENUM_FIELD_VALUES = (
+    [pytest.param("result", result, id=f"result-{result}") for result in list(Result)]
+    + [
+        pytest.param("time_class", time_class, id=f"time_class-{time_class}")
+        for time_class in list(TimeClass)
+    ]
+    + [pytest.param("colour", colour, id=f"colour-{colour}") for colour in list(Colour)]
+)
+
 
 def _count_games_table_rows(db_path: Path) -> int:
     with db.get_connection(db_path) as conn:
         return int(conn.execute("SELECT COUNT(*) FROM games").fetchone()[0])
+
+
+class DummyError(Exception):
+    pass
 
 
 class TestAddGames:
@@ -46,6 +60,8 @@ class TestAddGames:
             )
             assert db.add_games(conn, [fake_game_row_black_player]) == 1
 
+        assert _count_games_table_rows(temp_db) == 2
+
 
 class TestAddArchiveState:
     ARCHIVE_STATE: ClassVar[db.ArchiveStateRow] = db.ArchiveStateRow(
@@ -74,14 +90,59 @@ class TestAddArchiveState:
 
 
 class TestGetConnection:
-    @pytest.mark.skip("not written yet")
-    def test_rolls_back_on_error(self) -> None: ...
+    def _add_fake_game_row_and_raise_exception(
+        self, db_path: Path, row: GameRow
+    ) -> NoReturn:
+        with db.get_connection(db_path) as conn:
+            db.add_games(conn, [row])
+            raise DummyError("TEST EXCEPTION")
+
+    def test_rolls_back_on_error(self, temp_db: Path, fake_game_row: GameRow) -> None:
+        with pytest.raises(DummyError, match="TEST EXCEPTION"):
+            self._add_fake_game_row_and_raise_exception(temp_db, fake_game_row)
+
+        assert _count_games_table_rows(temp_db) == 0
 
 
 class TestInitDb:
-    @pytest.mark.skip("not written yet")
-    def test_can_run_twice(self) -> None: ...
-    @pytest.mark.skip("not written yet")
-    def test_check_accepts_every_enum_value(self) -> None: ...
-    @pytest.mark.skip("not written yet")
-    def test_check_rejects_unknown_value(self) -> None: ...
+    def test_can_run_twice(self, temp_db: Path, fake_game_row: GameRow) -> None:
+        with db.get_connection(temp_db) as conn:
+            db.add_games(conn, [fake_game_row])
+
+        assert _count_games_table_rows(temp_db) == 1
+        db.init_db(temp_db)
+        assert _count_games_table_rows(temp_db) == 1
+
+    @pytest.mark.parametrize(("field", "value"), VALID_ENUM_FIELD_VALUES)
+    def test_check_accepts_every_enum_value(
+        self,
+        temp_db: Path,
+        fake_game_row: GameRow,
+        field: str,
+        value: Result | TimeClass | Colour,
+    ) -> None:
+        updated_game_row = fake_game_row.model_copy(update={field: value})
+
+        with db.get_connection(temp_db) as conn:
+            assert db.add_games(conn, [updated_game_row]) == 1
+
+        assert _count_games_table_rows(temp_db) == 1
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            pytest.param("result", "resigned", id="invalid result"),
+            pytest.param("time_class", "classical", id="invalid time class"),
+            pytest.param("colour", "blue", id="invalid color"),
+        ],
+    )
+    @pytest.mark.filterwarnings("ignore:Pydantic serializer")
+    def test_check_rejects_unknown_value(
+        self, temp_db: Path, fake_game_row: GameRow, field: str, value: str
+    ) -> None:
+        updated_game_row = fake_game_row.model_copy(update={field: value})
+
+        with pytest.raises(IntegrityError), db.get_connection(temp_db) as conn:
+            db.add_games(conn, [updated_game_row])
+
+        assert _count_games_table_rows(temp_db) == 0
