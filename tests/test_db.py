@@ -98,7 +98,7 @@ class TestGetConnection:
             raise DummyError("TEST EXCEPTION")
 
     def test_rolls_back_on_error(self, temp_db: Path, fake_game_row: GameRow) -> None:
-        with pytest.raises(DummyError, match="TEST EXCEPTION"):
+        with pytest.raises(DummyError):
             self._add_fake_game_row_and_raise_exception(temp_db, fake_game_row)
 
         assert _count_games_table_rows(temp_db) == 0

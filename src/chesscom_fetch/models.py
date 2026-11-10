@@ -133,7 +133,7 @@ class Player(BaseModel):
     """
 
     rating: NonNegativeInt = Field(le=MAX_RATING)
-    result: APIResult
+    result: str
     id: HttpUrl = Field(alias="@id")
     username: Annotated[str, StringConstraints(to_lower=True, strip_whitespace=True)]
     uuid: UUID
