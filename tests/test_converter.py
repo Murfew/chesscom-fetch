@@ -9,6 +9,7 @@ from chesscom_fetch.converter import (
     VariantGameError,
     api_result_to_result,
     game_to_game_row,
+    is_month_complete,
 )
 from chesscom_fetch.models import APIResult, Colour, Game, Result
 from tests.helpers import TEST_USERNAME_BLACK, TEST_USERNAME_WHITE
@@ -80,9 +81,9 @@ class TestGameToGameRow:
         [
             pytest.param(
                 "1. e4 c6 2. d4 d5 3. e5 Bf5 4. Nf3 e6 5. Qh5 c5 6. O-O Nc6 0-1",
-                id="illegal pgn",
+                id="illegal-pgn",
             ),
-            pytest.param("", id="empty pgn"),
+            pytest.param("", id="empty-pgn"),
         ],
     )
     def test_rejects_invalid_pgn(self, fake_game: Game, bad_pgn: str) -> None:
@@ -157,3 +158,28 @@ class TestApiResultToResult:
 
     def test_returns_none_for_unknown_code(self) -> None:
         assert api_result_to_result(UNKNOWN_API_RESULT_CODE) is None
+
+
+class TestIsMonthComplete:
+    @pytest.mark.parametrize(
+        ("year", "month", "today", "expected"),
+        [
+            pytest.param(2026, 3, date(2026, 3, 15), False, id="during-month"),
+            pytest.param(2026, 3, date(2026, 4, 1), False, id="just-before-boundary"),
+            pytest.param(2026, 3, date(2026, 4, 2), True, id="exactly-at-boundary"),
+            pytest.param(
+                2026, 12, date(2027, 1, 2), True, id="december-rolls-into-next-year"
+            ),
+            pytest.param(2028, 2, date(2028, 3, 1), False, id="february-leap-year"),
+            pytest.param(
+                2026, 12, date(2026, 12, 15), False, id="december-before-boudary"
+            ),
+            pytest.param(
+                2026, 11, date(2026, 12, 2), True, id="november-stays-in-same-year"
+            ),
+        ],
+    )
+    def test_returns_correct_value(
+        self, year: int, month: int, today: date, expected: bool
+    ) -> None:
+        assert is_month_complete(year, month, today) == expected
