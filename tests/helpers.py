@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 from httpx2 import Request, Response, codes
 
 from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Archive
 
 type Handler = Callable[[Request], Response]
 
@@ -18,23 +17,6 @@ TEST_ARCHIVE_MONTH_URLS = [
     f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/2026/01",
     f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/2026/02",
     f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/2026/03",
-]
-TEST_ARCHIVES = [
-    Archive(
-        url=TEST_ARCHIVE_MONTH_URLS[0],
-        year=2026,
-        month=1,
-    ),
-    Archive(
-        url=TEST_ARCHIVE_MONTH_URLS[1],
-        year=2026,
-        month=2,
-    ),
-    Archive(
-        url=TEST_ARCHIVE_MONTH_URLS[2],
-        year=2026,
-        month=3,
-    ),
 ]
 
 
@@ -49,3 +31,7 @@ def build_429_response(retry_after: float) -> Response:
         status_code=codes.TOO_MANY_REQUESTS,
         headers={"retry-after": str(retry_after)},
     )
+
+
+def build_archive_url(year: int, month: int) -> str:
+    return f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/{year}/{month:02d}"

@@ -13,10 +13,9 @@ from chesscom_fetch.http import (
     RateLimitExhaustedError,
     _retry_after_seconds,
 )
-from chesscom_fetch.models import Game
+from chesscom_fetch.models import Archive, Game
 from tests.helpers import (
     TEST_ARCHIVE_MONTH_URLS,
-    TEST_ARCHIVES,
     TEST_ETAG,
     TEST_USERNAME_WHITE,
     MakeChessClient,
@@ -44,7 +43,9 @@ class TestGetArchiveList:
         client = make_http_client(handler)
         archive_list = client.get_archive_list()
 
-        assert archive_list.archives == TEST_ARCHIVES
+        assert archive_list.archives == [
+            Archive.model_validate(url) for url in TEST_ARCHIVE_MONTH_URLS
+        ]
 
     def test_sends_user_agent(
         self,

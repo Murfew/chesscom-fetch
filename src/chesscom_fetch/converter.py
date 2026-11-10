@@ -1,5 +1,4 @@
 import io
-from calendar import DECEMBER
 from datetime import date
 
 import chess.pgn
@@ -144,30 +143,3 @@ def api_result_to_result(api_result: str) -> Result | None:
             return Result.DRAW
         case _:
             return None
-
-
-def is_month_complete(year: int, month: int, today: date) -> bool:
-    """Return whether an archive month can no longer change.
-
-    Chess.com can still add games to a month for up to 24 hours after it
-    ends, so a month counts as complete from 00:00 UTC on the 2nd of the
-    following month.
-
-    Args:
-        year: The archive's year, e.g. 2026.
-        month: The archive's month, 1-12.
-        today: Today's date in UTC.
-
-    Returns:
-        True if the month is complete, False if it may still change.
-    """
-    if month == DECEMBER:
-        next_month = 1
-        next_year = year + 1
-    else:
-        next_month = month + 1
-        next_year = year
-
-    target_date = date(next_year, next_month, 2)
-
-    return today >= target_date
