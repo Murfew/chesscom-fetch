@@ -109,9 +109,13 @@ def fetch(
             help="Number of months of data to fetch, including this one.",
         ),
     ] = 1,
-    time_class: Annotated[
-        TimeClass, typer.Option(help="Time control of the games to fetch.")
-    ] = TimeClass.RAPID,
+    time_classes: Annotated[
+        list[TimeClass] | None,
+        typer.Option(
+            "--time-class",
+            help="Time class to include in the report. Repeat for more. Defaults to all.",
+        ),
+    ] = None,
 ) -> None:
     """Download a player's games from chess.com and save them to the database.
 
@@ -120,6 +124,10 @@ def fetch(
         ctx: The Typer context; settings are read from `ctx.obj`.
         username: Chess.com username, stripped and lowercased.
         months: How many months to fetch, counting back from this one.
-        time_class: Only games of this time control are saved.
+        time_classes: Time classes to include in the report. Every standard
+            game is stored either way. Defaults to all.
     """  # ruff: ignore[escape-sequence-in-docstring]
     config = _as_cli_config(ctx.obj)
+
+    if time_classes is None:
+        time_classes = list(TimeClass)
