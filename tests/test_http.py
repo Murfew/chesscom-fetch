@@ -172,31 +172,31 @@ class TestRetryAfterSeconds:
     @pytest.mark.parametrize(
         ("header_value", "expected_seconds"),
         [
-            pytest.param("10", 10, id="normal number"),
+            pytest.param("10", 10, id="normal-number"),
             pytest.param(
                 str(MAX_RETRY_WAIT_TIME_SECONDS),
                 MAX_RETRY_WAIT_TIME_SECONDS,
-                id="exactly the maximum",
+                id="exactly-maximum",
             ),
             pytest.param(
                 str(MAX_RETRY_WAIT_TIME_SECONDS + 1),
                 DEFAULT_RETRY_WAIT_TIME_SECONDS,
-                id="just over the maximum",
+                id="just-over-maximum",
             ),
-            pytest.param("-1", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="negative number"),
+            pytest.param("-1", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="negative-number"),
             pytest.param("nan", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="nan"),
             pytest.param("inf", DEFAULT_RETRY_WAIT_TIME_SECONDS, id="inf"),
             pytest.param(
                 "Mon, 09 Nov 2026 16:26:00 GMT",
                 DEFAULT_RETRY_WAIT_TIME_SECONDS,
-                id="HTTP date",
+                id="HTTP-date",
             ),
             pytest.param(
                 "sadasdasdafadfsd",
                 DEFAULT_RETRY_WAIT_TIME_SECONDS,
-                id="nonsense string",
+                id="nonsense-string",
             ),
-            pytest.param(None, DEFAULT_RETRY_WAIT_TIME_SECONDS, id="empty header"),
+            pytest.param(None, DEFAULT_RETRY_WAIT_TIME_SECONDS, id="empty-header"),
         ],
     )
     def test_parses_or_falls_back(

@@ -131,9 +131,9 @@ class TestInitDb:
     @pytest.mark.parametrize(
         ("field", "value"),
         [
-            pytest.param("result", "resigned", id="invalid result"),
-            pytest.param("time_class", "classical", id="invalid time class"),
-            pytest.param("colour", "blue", id="invalid color"),
+            pytest.param("result", "resigned", id="invalid-result"),
+            pytest.param("time_class", "classical", id="invalid-time class"),
+            pytest.param("colour", "blue", id="invalid-color"),
         ],
     )
     @pytest.mark.filterwarnings("ignore:Pydantic serializer")
