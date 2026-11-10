@@ -96,20 +96,21 @@ def _to_archive_state_row(
     return ArchiveStateRow(url, etag, bool(complete))
 
 
-def get_archive_states(db_path: Path) -> list[ArchiveStateRow]:
-    """Fetch every stored archive state.
+def get_archive_state(conn: Connection, url: str) -> ArchiveStateRow | None:
+    """Fetch the stored state for one archive month.
 
     Args:
-        db_path: Path to the SQLite database file.
+        conn: SQLite database connection.
+        url: The archive month's URL.
 
     Returns:
-        All rows from `archive_states`, as `ArchiveStateRow` tuples.
+        The stored state, or None if this month has never been fetched.
     """
-    with get_connection(db_path) as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM archive_states")
-        cur.row_factory = _to_archive_state_row
-        return cur.fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM archive_states WHERE url = ?", (url,))
+    cur.row_factory = _to_archive_state_row
+    row: ArchiveStateRow | None = cur.fetchone()
+    return row
 
 
 def add_archive_state(conn: Connection, state: ArchiveStateRow) -> None:

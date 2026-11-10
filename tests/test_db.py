@@ -72,9 +72,9 @@ class TestAddArchiveState:
         with db.get_connection(temp_db) as conn:
             db.add_archive_state(conn, self.ARCHIVE_STATE)
 
-        saved_state = db.get_archive_states(temp_db)[0]
-        assert saved_state == self.ARCHIVE_STATE
-        assert type(saved_state.complete) is bool
+            saved_state = db.get_archive_state(conn, self.ARCHIVE_STATE.url)
+            assert saved_state == self.ARCHIVE_STATE
+            assert type(saved_state.complete) is bool
 
     def test_updates_existing_state(self, temp_db: Path) -> None:
         with db.get_connection(temp_db) as conn:
@@ -85,8 +85,8 @@ class TestAddArchiveState:
             )
             db.add_archive_state(conn, new_state)
 
-        saved_state = db.get_archive_states(temp_db)[0]
-        assert saved_state == new_state
+            saved_state = db.get_archive_state(conn, new_state.url)
+            assert saved_state == new_state
 
 
 class TestGetConnection:
