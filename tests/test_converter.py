@@ -11,10 +11,13 @@ from chesscom_fetch.converter import (
     game_to_game_row,
 )
 from chesscom_fetch.models import APIResult, Colour, Game, Result
-from tests.helpers import TEST_USERNAME_BLACK, TEST_USERNAME_WHITE
+from tests.helpers import (
+    TEST_USERNAME_BLACK,
+    TEST_USERNAME_WHITE,
+    UNKNOWN_API_RESULT_CODE,
+)
 
 TODAY = date.fromisoformat("2026-10-24")
-UNKNOWN_API_RESULT_CODE = "unknown"
 
 
 class TestGameToGameRow:

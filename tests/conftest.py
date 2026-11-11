@@ -59,8 +59,8 @@ def fake_game_row(fake_game: Game) -> GameRow:
 
 
 @pytest.fixture
-def make_http_client(mocker: MockFixture) -> MakeChessClient:
-    def _make_http_client(
+def make_chess_client(mocker: MockFixture) -> MakeChessClient:
+    def _make_chess_client(
         handler: Handler, wait_mock: MagicMock | None = None
     ) -> ChessClient:
         return ChessClient(
@@ -69,4 +69,4 @@ def make_http_client(mocker: MockFixture) -> MakeChessClient:
             wait_mock if wait_mock is not None else mocker.MagicMock(),
         )
 
-    return _make_http_client
+    return _make_chess_client

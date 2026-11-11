@@ -15,32 +15,34 @@ from chesscom_fetch.http import (
 )
 from chesscom_fetch.models import Archive, Game
 from tests.helpers import (
+    ARCHIVE_LIST_URL,
     TEST_ARCHIVE_MONTH_URLS,
     TEST_ETAG,
     TEST_USERNAME_WHITE,
     MakeChessClient,
-    build_429_response,
+    build_archive_list_response,
+    build_archive_month_response,
 )
 
-ARCHIVE_LIST_URL = (
-    f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/archives"
-)
+
+def build_429_response(retry_after: float) -> Response:
+    return Response(
+        status_code=codes.TOO_MANY_REQUESTS,
+        headers={"retry-after": str(retry_after)},
+    )
 
 
 class TestGetArchiveList:
     def test_returns_archives(
         self,
-        make_http_client: MakeChessClient,
+        make_chess_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
             assert request.url == ARCHIVE_LIST_URL
 
-            return Response(
-                codes.OK,
-                json={"archives": TEST_ARCHIVE_MONTH_URLS},
-            )
+            return build_archive_list_response(TEST_ARCHIVE_MONTH_URLS)
 
-        client = make_http_client(handler)
+        client = make_chess_client(handler)
         archive_list = client.get_archive_list()
 
         assert archive_list.archives == [
@@ -49,28 +51,25 @@ class TestGetArchiveList:
 
     def test_sends_user_agent(
         self,
-        make_http_client: MakeChessClient,
+        make_chess_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
 
             assert request.headers.get("user-agent") == USER_AGENT
 
-            return Response(
-                codes.OK,
-                json={"archives": TEST_ARCHIVE_MONTH_URLS},
-            )
+            return build_archive_list_response(TEST_ARCHIVE_MONTH_URLS)
 
-        client = make_http_client(handler)
+        client = make_chess_client(handler)
         client.get_archive_list()
 
     def test_raises_player_not_found_on_404(
         self,
-        make_http_client: MakeChessClient,
+        make_chess_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
             return Response(status_code=codes.NOT_FOUND)
 
-        client = make_http_client(handler)
+        client = make_chess_client(handler)
         with pytest.raises(
             PlayerNotFoundError,
             match=f"404.*{TEST_USERNAME_WHITE}",
@@ -79,12 +78,12 @@ class TestGetArchiveList:
 
     def test_includes_url_and_status_on_unexpected_error(
         self,
-        make_http_client: MakeChessClient,
+        make_chess_client: MakeChessClient,
     ) -> None:
         def handler(request: Request) -> Response:
             return Response(status_code=codes.INTERNAL_SERVER_ERROR)
 
-        client = make_http_client(handler)
+        client = make_chess_client(handler)
         with pytest.raises(ChessFetcherError, match=f"500.*{ARCHIVE_LIST_URL}"):
             client.get_archive_list()
 
@@ -93,15 +92,13 @@ class TestGetWithRetry:
     RETRY_AFTER: ClassVar[int] = 10
 
     def test_retries_once_after_429(
-        self, make_http_client: MakeChessClient, mocker: MockerFixture
+        self, make_chess_client: MakeChessClient, mocker: MockerFixture
     ) -> None:
         requests: list[Request] = []
         responses = iter(
             [
                 build_429_response(self.RETRY_AFTER),
-                Response(
-                    status_code=codes.OK, json={"archives": TEST_ARCHIVE_MONTH_URLS}
-                ),
+                build_archive_list_response(TEST_ARCHIVE_MONTH_URLS),
             ]
         )
 
@@ -110,23 +107,21 @@ class TestGetWithRetry:
             return next(responses)
 
         wait_mock = mocker.MagicMock()
-        client = make_http_client(handler, wait_mock)
+        client = make_chess_client(handler, wait_mock)
         client.get_archive_list()
 
         wait_mock.assert_called_once_with(self.RETRY_AFTER)
         assert len(requests) == 2
 
     def test_gives_up_after_second_429(
-        self, make_http_client: MakeChessClient, mocker: MockerFixture
+        self, make_chess_client: MakeChessClient, mocker: MockerFixture
     ) -> None:
         requests: list[Request] = []
         responses = iter(
             [
                 build_429_response(self.RETRY_AFTER),
                 build_429_response(self.RETRY_AFTER),
-                Response(
-                    status_code=codes.OK, json={"archives": TEST_ARCHIVE_MONTH_URLS}
-                ),
+                build_archive_list_response(TEST_ARCHIVE_MONTH_URLS),
             ]
         )
 
@@ -135,7 +130,7 @@ class TestGetWithRetry:
             return next(responses)
 
         wait_mock = mocker.MagicMock()
-        client = make_http_client(handler, wait_mock)
+        client = make_chess_client(handler, wait_mock)
 
         with pytest.raises(RateLimitExhaustedError):
             client.get_archive_list()
@@ -146,27 +141,24 @@ class TestGetWithRetry:
 
 class TestGetArchiveMonth:
     def test_sends_if_none_match(
-        self, make_http_client: MakeChessClient, fake_game: Game
+        self, make_chess_client: MakeChessClient, fake_game: Game
     ) -> None:
 
         def handler(request: Request) -> Response:
             assert request.headers.get("if-none-match") == TEST_ETAG
 
-            return Response(
-                status_code=codes.OK,
-                json={"games": [fake_game.model_dump(mode="json", by_alias=True)]},
-            )
+            return build_archive_month_response([fake_game])
 
-        client = make_http_client(handler)
+        client = make_chess_client(handler)
         client.get_archive_month(TEST_ARCHIVE_MONTH_URLS[0], TEST_ETAG)
 
-    def test_returns_none_on_304(self, make_http_client: MakeChessClient) -> None:
+    def test_returns_none_on_304(self, make_chess_client: MakeChessClient) -> None:
         def handler(request: Request) -> Response:
             return Response(
                 status_code=codes.NOT_MODIFIED,
             )
 
-        client = make_http_client(handler)
+        client = make_chess_client(handler)
         assert client.get_archive_month(TEST_ARCHIVE_MONTH_URLS[0]) is None
 
 

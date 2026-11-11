@@ -1,10 +1,40 @@
+from collections.abc import Mapping
 from datetime import date
+from pathlib import Path
 
 import pytest
+from httpx2 import Request, Response, codes
+from pydantic import HttpUrl
 
-from chesscom_fetch.models import Archive
-from chesscom_fetch.sync import _is_archive_in_window, _is_month_complete
-from tests.helpers import build_archive_url
+from chesscom_fetch.db import (
+    ArchiveStateRow,
+    add_archive_state,
+    get_archive_state,
+    get_connection,
+)
+from chesscom_fetch.http import ChessClient
+from chesscom_fetch.models import Archive, Game, TimeClass
+from chesscom_fetch.sync import (
+    SyncSummary,
+    _is_archive_in_window,
+    _is_month_complete,
+    sync,
+)
+from tests.helpers import (
+    ARCHIVE_LIST_URL,
+    TEST_ETAG,
+    TEST_USERNAME_WHITE,
+    UNKNOWN_API_RESULT_CODE,
+    Handler,
+    MakeChessClient,
+    build_archive_list_response,
+    build_archive_month_response,
+    count_games_table_rows,
+)
+
+
+def build_archive_url(year: int, month: int) -> str:
+    return f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/{year}/{month:02d}"
 
 
 class TestIsMonthComplete:
@@ -131,9 +161,187 @@ class TestIsArchiveInWindow:
 
 
 class TestSync:
-    def test_stores_games_from_months_in_window(self) -> None: ...
-    def test_skips_complete_months_without_request(self) -> None: ...
-    def test_sends_stored_etag_and_counts_unchanged_month(self) -> None: ...
-    def test_counts_skipped_games(self) -> None: ...
-    def test_saves_new_etag_and_completeness(self) -> None: ...
-    def test_second_run_stores_no_duplicates(self) -> None: ...
+    SEPTEMBER_URL = build_archive_url(2026, 9)
+    OCTOBER_URL = build_archive_url(2026, 10)
+    NOVEMBER_URL = build_archive_url(2026, 11)
+    TODAY = date(2026, 11, 10)
+
+    def build_handler(
+        self, response_by_url: Mapping[str, Response], requests_record: list[str]
+    ) -> Handler:
+        def _handler(request: Request) -> Response:
+            requests_record.append(str(request.url))
+            return response_by_url.get(str(request.url), Response(codes.NOT_FOUND))
+
+        return _handler
+
+    def make_client(
+        self,
+        make_chess_client: MakeChessClient,
+        response_by_url: Mapping[str, Response],
+    ) -> tuple[ChessClient, list[str]]:
+        requests: list[str] = []
+        handler = self.build_handler(response_by_url, requests)
+        client = make_chess_client(handler)
+
+        return client, requests
+
+    def run_sync(
+        self, *, chess_client: ChessClient, db_path: Path, months: int
+    ) -> SyncSummary:
+        return sync(
+            chess_client=chess_client,
+            db_path=db_path,
+            username=TEST_USERNAME_WHITE,
+            months=months,
+            today=self.TODAY,
+        )
+
+    def test_stores_games_from_months_in_window(
+        self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        response_by_url = {
+            ARCHIVE_LIST_URL: build_archive_list_response(
+                [self.SEPTEMBER_URL, self.OCTOBER_URL, self.NOVEMBER_URL]
+            ),
+            self.OCTOBER_URL: build_archive_month_response([fake_game]),
+            self.NOVEMBER_URL: build_archive_month_response([]),
+        }
+        client, requests = self.make_client(make_chess_client, response_by_url)
+        summary = self.run_sync(chess_client=client, db_path=temp_db, months=2)
+        assert summary.new_games[TimeClass.RAPID] == 1
+        assert count_games_table_rows(temp_db) == 1
+        assert self.SEPTEMBER_URL not in requests
+
+    def test_skips_complete_months_without_request(
+        self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_archive_state(
+                conn,
+                ArchiveStateRow(url=self.NOVEMBER_URL, etag=TEST_ETAG, complete=True),
+            )
+
+        response_by_url = {
+            ARCHIVE_LIST_URL: build_archive_list_response([self.NOVEMBER_URL]),
+            self.NOVEMBER_URL: build_archive_month_response([fake_game]),
+        }
+
+        client, requests = self.make_client(make_chess_client, response_by_url)
+
+        summary = self.run_sync(chess_client=client, db_path=temp_db, months=1)
+
+        assert summary.months_completed == 1
+        assert self.NOVEMBER_URL not in requests
+
+    def test_sends_stored_etag_and_counts_unchanged_month(
+        self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_archive_state(
+                conn,
+                ArchiveStateRow(url=self.NOVEMBER_URL, etag=TEST_ETAG, complete=False),
+            )
+
+        def handler(request: Request) -> Response:
+            if request.url == ARCHIVE_LIST_URL:
+                return build_archive_list_response([self.NOVEMBER_URL])
+
+            etag = request.headers.get("if-none-match")
+            if etag == TEST_ETAG:
+                return Response(codes.NOT_MODIFIED)
+
+            return build_archive_month_response([fake_game])
+
+        client = make_chess_client(handler)
+
+        summary = self.run_sync(chess_client=client, db_path=temp_db, months=1)
+
+        assert sum(summary.new_games.values()) == 0
+        assert summary.months_unchanged == 1
+
+    def test_counts_skipped_games(
+        self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        fake_game_with_variant = fake_game.model_copy(
+            update={
+                "url": HttpUrl("https://www.chess.com/game/live/123456789013"),
+                "rules": "chess960",
+            }
+        )
+        player_with_unknown_result = fake_game.white.model_copy(
+            update={"result": UNKNOWN_API_RESULT_CODE}
+        )
+        fake_game_with_unknown_result = fake_game.model_copy(
+            update={
+                "url": HttpUrl("https://www.chess.com/game/live/123456789014"),
+                "white": player_with_unknown_result,
+            }
+        )
+
+        response_by_url = {
+            ARCHIVE_LIST_URL: build_archive_list_response([self.NOVEMBER_URL]),
+            self.NOVEMBER_URL: build_archive_month_response(
+                [fake_game, fake_game_with_variant, fake_game_with_unknown_result]
+            ),
+        }
+
+        client, _ = self.make_client(make_chess_client, response_by_url)
+
+        summary = self.run_sync(chess_client=client, db_path=temp_db, months=1)
+
+        assert sum(summary.new_games.values()) == 1
+        assert summary.game_variants == 1
+        assert summary.unknown_result_codes[UNKNOWN_API_RESULT_CODE] == 1
+        assert count_games_table_rows(temp_db) == 1
+
+    def test_saves_new_etag_and_completeness(
+        self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        response_by_url = {
+            ARCHIVE_LIST_URL: build_archive_list_response(
+                [self.SEPTEMBER_URL, self.OCTOBER_URL, self.NOVEMBER_URL]
+            ),
+            self.OCTOBER_URL: build_archive_month_response([fake_game], TEST_ETAG),
+            self.NOVEMBER_URL: build_archive_month_response([]),
+        }
+
+        client, _ = self.make_client(make_chess_client, response_by_url)
+
+        self.run_sync(chess_client=client, db_path=temp_db, months=2)
+
+        with get_connection(temp_db) as conn:
+            october_state = get_archive_state(conn, self.OCTOBER_URL)
+            november_state = get_archive_state(conn, self.NOVEMBER_URL)
+
+        assert october_state is not None
+        assert october_state.etag == TEST_ETAG
+        assert october_state.complete
+
+        assert november_state is not None
+        assert november_state.etag is None
+        assert not november_state.complete
+
+    def test_second_run_stores_no_duplicates(
+        self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        response_by_url = {
+            ARCHIVE_LIST_URL: build_archive_list_response(
+                [self.SEPTEMBER_URL, self.OCTOBER_URL, self.NOVEMBER_URL]
+            ),
+            self.OCTOBER_URL: build_archive_month_response([]),
+            self.NOVEMBER_URL: build_archive_month_response([fake_game]),
+        }
+
+        client, requests = self.make_client(make_chess_client, response_by_url)
+
+        first_run_summary = self.run_sync(
+            chess_client=client, db_path=temp_db, months=1
+        )
+        second_run_summary = self.run_sync(
+            chess_client=client, db_path=temp_db, months=1
+        )
+
+        assert requests.count(self.NOVEMBER_URL) == 2
+        assert sum(first_run_summary.new_games.values()) == 1
+        assert sum(second_run_summary.new_games.values()) == 0
