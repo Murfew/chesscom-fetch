@@ -26,12 +26,16 @@ from chesscom_fetch.models import Archive, Game, GameRow, TimeClass
 MONTHS_PER_YEAR = 12
 
 
+def get_first_month_in_window(today: date, months: int) -> tuple[int, int]:
+    """Return the (year, month) the `months` window starts at, counting this month."""
+    total = today.year * 12 + today.month - months
+    year, month = divmod(total, 12)
+    return year, month + 1
+
+
 def _is_archive_in_window(months: int, archive: Archive, today: date) -> bool:
     """Return whether an archive is within the last months months, inclusive."""
-    archive_total_months = archive.year * MONTHS_PER_YEAR + archive.month
-    today_total_months = today.year * MONTHS_PER_YEAR + today.month
-
-    return archive_total_months >= (today_total_months - (months - 1))
+    return (archive.year, archive.month) >= get_first_month_in_window(today, months)
 
 
 def _is_month_complete(archive: Archive, today: date) -> bool:
