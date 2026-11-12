@@ -1,16 +1,18 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import date
 from pathlib import Path
 from typing import Protocol
 from unittest.mock import MagicMock
 
 from httpx2 import Request, Response, codes
+from typer.testing import Result
 
 from chesscom_fetch.db import get_connection
 from chesscom_fetch.http import ChessClient
 from chesscom_fetch.models import Game
 
 type Handler = Callable[[Request], Response]
+type PatchGetChessClient = Callable[[Mapping[str, Response]], list[str]]
 
 TEST_USERNAME_WHITE = "testplayerwhite"
 TEST_USERNAME_BLACK = "testplayerblack"
@@ -33,6 +35,14 @@ class MakeChessClient(Protocol):
     ) -> ChessClient: ...
 
 
+class GetFetchResult(Protocol):
+    def __call__(
+        self,
+        response_by_url: Mapping[str, Response],
+        extra_args: list[str] | None = ...,
+    ) -> Result: ...
+
+
 def build_archive_month_response(
     games: list[Game], etag: str | None = None
 ) -> Response:
@@ -52,3 +62,17 @@ def build_archive_list_response(urls: list[str]) -> Response:
 def count_games_table_rows(db_path: Path) -> int:
     with get_connection(db_path) as conn:
         return int(conn.execute("SELECT COUNT(*) FROM games").fetchone()[0])
+
+
+def build_handler(
+    response_by_url: Mapping[str, Response], requests_record: list[str]
+) -> Handler:
+    def _handler(request: Request) -> Response:
+        requests_record.append(str(request.url))
+        return response_by_url.get(str(request.url), Response(codes.NOT_FOUND))
+
+    return _handler
+
+
+def build_archive_url(year: int, month: int) -> str:
+    return f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/{year}/{month:02d}"

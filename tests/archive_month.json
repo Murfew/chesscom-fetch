@@ -1,0 +1,100 @@
+{
+  "games": [
+    {
+      "url": "https://www.chess.com/game/daily/29099782",
+      "pgn": "[Event \"Let's Play!\"]\n[Site \"Chess.com\"]\n[Date \"2009.10.01\"]\n[Round \"-\"]\n[White \"Mainline_Novelty\"]\n[Black \"erik\"]\n[Result \"1-0\"]\n[CurrentPosition \"r2q1rk1/3nppbp/2pp1np1/pp4Nb/3PP1P1/PBN1B2P/1PPQ1P2/R3K2R b KQ g3 1 12\"]\n[Timezone \"UTC\"]\n[ECO \"B06\"]\n[ECOUrl \"https://www.chess.com/openings/Modern-Defense-Standard-Two-Knights-Suttles-Variation-5.Be3-Nf6-6.Qd2\"]\n[UTCDate \"2009.10.01\"]\n[UTCTime \"23:14:41\"]\n[WhiteElo \"1633\"]\n[BlackElo \"1920\"]\n[TimeControl \"1/259200\"]\n[Termination \"Mainline_Novelty won by resignation\"]\n[StartTime \"23:14:41\"]\n[EndDate \"2009.10.04\"]\n[EndTime \"15:38:54\"]\n[Link \"https://www.chess.com/game/daily/29099782\"]\n\n1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Be3 Bg7 5. Qd2 c6 6. Nf3 Bg4 7. Bc4 b5 8. Bb3 a5 9. a3 Nbd7 10. Ng5 O-O 11. h3 Bh5 12. g4 1-0\n",
+      "time_control": "1/259200",
+      "end_time": 1254670734,
+      "rated": true,
+      "accuracies": {
+        "white": 96.18,
+        "black": 83.72
+      },
+      "tcn": "mCZRlB!Tbs2Ucu92dlYQgv6EfAXHArWGiq5ZvM8!pxENoE",
+      "uuid": "3277772e-aee0-11de-830e-00000001000b",
+      "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "fen": "r2q1rk1/3nppbp/2pp1np1/pp4Nb/3PP1P1/PBN1B2P/1PPQ1P2/R3K2R b KQ g3 1 12",
+      "start_time": 1254438881,
+      "time_class": "daily",
+      "rules": "chess960",
+      "white": {
+        "rating": 1633,
+        "result": "win",
+        "@id": "https://api.chess.com/pub/player/mainline_novelty",
+        "username": "TestPlayerWhite",
+        "uuid": "9c535e34-2dd0-11dd-8006-000000000000"
+      },
+      "black": {
+        "rating": 1920,
+        "result": "resigned",
+        "@id": "https://api.chess.com/pub/player/erik",
+        "username": "TestPlayerBlack",
+        "uuid": "fe696c00-fcba-11db-8029-000000000000"
+      },
+      "eco": "https://www.chess.com/openings/Modern-Defense-Standard-Two-Knights-Suttles-Variation-5.Be3-Nf6-6.Qd2"
+    },
+    {
+      "url": "https://www.chess.com/game/daily/29150975",
+      "pgn": "[Event \"Let's Play!\"]\n[Site \"Chess.com\"]\n[Date \"2009.10.02\"]\n[Round \"-\"]\n[White \"nym\"]\n[Black \"erik\"]\n[Result \"0-1\"]\n[CurrentPosition \"4rk2/1pp2p2/p2b1n1p/3P1bp1/2BP1p2/P1N4P/1PP3P1/R1B3K1 w - - 2 17\"]\n[Timezone \"UTC\"]\n[ECO \"C36\"]\n[ECOUrl \"https://www.chess.com/openings/Kings-Gambit-Accepted-Modern-Defense-4.exd5-Bd6\"]\n[UTCDate \"2009.10.02\"]\n[UTCTime \"17:18:53\"]\n[WhiteElo \"1898\"]\n[BlackElo \"1920\"]\n[TimeControl \"1/432000\"]\n[Termination \"erik won by resignation\"]\n[StartTime \"17:18:53\"]\n[EndDate \"2009.10.04\"]\n[EndTime \"21:15:13\"]\n[Link \"https://www.chess.com/game/daily/29150975\"]\n\n1. e4 e5 2. f4 exf4 3. Nf3 d5 4. exd5 Bd6 5. Bc4 Nf6 6. Qe2+ Qe7 7. Qxe7+ Kxe7 8. d4 Re8 9. O-O h6 10. Ne5 g5 11. Re1 Kf8 12. Nc3 Nbd7 13. Nxd7+ Bxd7 14. Rxe8+ Rxe8 15. h3 a6 16. a3 Bf5 0-1\n",
+      "time_control": "1/432000",
+      "end_time": 1254690913,
+      "rated": false,
+      "accuracies": {
+        "white": 38.41,
+        "black": 95.89
+      },
+      "tcn": "mC0KnDKDgvZJCJ9RfA!Tdm70m080lB?8eg3VvK2Mfe09bs5ZKZ6Ze848pxWOiqZL",
+      "uuid": "a87aef2c-af77-11de-83cf-00000001000b",
+      "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "fen": "4rk2/1pp2p2/p2b1n1p/3P1bp1/2BP1p2/P1N4P/1PP3P1/R1B3K1 w - - 2 17",
+      "start_time": 1254503933,
+      "time_class": "daily",
+      "rules": "chess",
+      "white": {
+        "rating": 1898,
+        "result": "resigned",
+        "@id": "https://api.chess.com/pub/player/nym",
+        "username": "TestPlayerWhite",
+        "uuid": "d5f6f9fa-c229-11dd-8001-000000000000"
+      },
+      "black": {
+        "rating": 1920,
+        "result": "win",
+        "@id": "https://api.chess.com/pub/player/erik",
+        "username": "TestPlayerBlack",
+        "uuid": "fe696c00-fcba-11db-8029-000000000000"
+      },
+      "eco": "https://www.chess.com/openings/Kings-Gambit-Accepted-Modern-Defense-4.exd5-Bd6"
+    },
+    {
+      "url": "https://www.chess.com/game/daily/29076797",
+      "pgn": "[Event \"6th Chess.com Quick Knockouts (1801-2000) - Round 1\"]\n[Site \"Chess.com\"]\n[Date \"2009.10.01\"]\n[Round \"-\"]\n[White \"flirtyking\"]\n[Black \"erik\"]\n[Result \"0-1\"]\n[Tournament \"https://www.chess.com/tournament/6th-chesscom-quick-knockouts-1801-2000\"]\n[CurrentPosition \"4R3/8/8/5p2/8/4pk2/8/1r4K1 w - - 7 54\"]\n[Timezone \"UTC\"]\n[ECO \"E91\"]\n[ECOUrl \"https://www.chess.com/openings/Kings-Indian-Defense-Orthodox-Variation-6...c5-7.d5-Na6-8.O-O\"]\n[UTCDate \"2009.10.01\"]\n[UTCTime \"17:09:06\"]\n[WhiteElo \"2005\"]\n[BlackElo \"1945\"]\n[TimeControl \"1/86400\"]\n[Termination \"erik won by resignation\"]\n[StartTime \"17:09:06\"]\n[EndDate \"2009.10.05\"]\n[EndTime \"03:21:16\"]\n[Link \"https://www.chess.com/game/daily/29076797\"]\n\n1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 Na6 7. O-O c5 8. d5 Bd7 9. h3 Rb8 10. a3 Nc7 11. b4 Nxe4 12. Nxe4 Bxa1 13. bxc5 dxc5 14. Nxc5 b5 15. Nxd7 Qxd7 16. Bf4 Bg7 17. cxb5 Rb7 18. Bxc7 Qxc7 19. a4 Rd8 20. Qb3 Qc3 21. Qxc3 Bxc3 22. Rc1 Bf6 23. Rd1 Rc7 24. Ne1 Rc5 25. Rb1 Rcxd5 26. Bf3 Rd2 27. a5 Bd4 28. b6 axb6 29. axb6 Bxf2+ 30. Kf1 Rb8 31. b7 Bxe1 32. Kxe1 Rd7 33. Ke2 e5 34. g4 f5 35. gxf5 gxf5 36. Bc6 Re7 37. Ra1 Rbxb7 38. Ra8+ Kg7 39. Bxb7 Rxb7 40. Re8 Kf6 41. Rc8 Rb3 42. Rc6+ Kg5 43. h4+ Kxh4 44. Rh6+ Kg3 45. Rxh7 Rb2+ 46. Ke3 Rb3+ 47. Ke2 e4 48. Rg7+ Kf4 49. Rf7 Rb2+ 50. Kf1 e3 51. Rf8 Ke4 52. Re8+ Kf3 53. Kg1 Rb1+ 0-1\n",
+      "time_control": "1/86400",
+      "end_time": 1254712876,
+      "rated": true,
+      "tcn": "lB!TkA2Ubs92mCZRgv8!fm5OegYIBJ6Zpx45iqOYjzTCsC2azIRICIXHIZ7ZcDa2AH5XDYZYqy97drYsrs2sfcsTcdXYveYIdbIJmvJlyGTBHPWPGPBngf75PXnefelZem0KoE1LELULvQZ0ba5Xa4!2QX0X482T86Xr6QTMxFMFQVFwV3rjmujrumKC32wD21rjmfCu19DC98Cvfgjb",
+      "uuid": "203014c8-aead-11de-831d-00000001000b",
+      "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "fen": "4R3/8/8/5p2/8/4pk2/8/1r4K1 w - - 7 54",
+      "start_time": 1254416946,
+      "time_class": "daily",
+      "rules": "chess",
+      "white": {
+        "rating": 2005,
+        "result": "resigned",
+        "@id": "https://api.chess.com/pub/player/flirtyking",
+        "username": "TestPlayerWhite",
+        "uuid": "adf075c0-e8cc-11dd-8044-000000000000"
+      },
+      "black": {
+        "rating": 1945,
+        "result": "win",
+        "@id": "https://api.chess.com/pub/player/erik",
+        "username": "TestPlayerBlack",
+        "uuid": "fe696c00-fcba-11db-8029-000000000000"
+      },
+      "eco": "https://www.chess.com/openings/Kings-Indian-Defense-Orthodox-Variation-6...c5-7.d5-Na6-8.O-O",
+      "tournament": "https://api.chess.com/pub/tournament/6th-chesscom-quick-knockouts-1801-2000"
+    }
+  ]
+}

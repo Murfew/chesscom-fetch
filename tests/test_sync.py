@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
@@ -25,16 +26,13 @@ from tests.helpers import (
     TEST_ETAG,
     TEST_USERNAME_WHITE,
     UNKNOWN_API_RESULT_CODE,
-    Handler,
     MakeChessClient,
     build_archive_list_response,
     build_archive_month_response,
+    build_archive_url,
+    build_handler,
     count_games_table_rows,
 )
-
-
-def build_archive_url(year: int, month: int) -> str:
-    return f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/{year}/{month:02d}"
 
 
 class TestIsMonthComplete:
@@ -166,22 +164,13 @@ class TestSync:
     NOVEMBER_URL = build_archive_url(2026, 11)
     TODAY = date(2026, 11, 10)
 
-    def build_handler(
-        self, response_by_url: Mapping[str, Response], requests_record: list[str]
-    ) -> Handler:
-        def _handler(request: Request) -> Response:
-            requests_record.append(str(request.url))
-            return response_by_url.get(str(request.url), Response(codes.NOT_FOUND))
-
-        return _handler
-
     def make_client(
         self,
         make_chess_client: MakeChessClient,
         response_by_url: Mapping[str, Response],
     ) -> tuple[ChessClient, list[str]]:
         requests: list[str] = []
-        handler = self.build_handler(response_by_url, requests)
+        handler = build_handler(response_by_url, requests)
         client = make_chess_client(handler)
 
         return client, requests
@@ -345,3 +334,21 @@ class TestSync:
         assert requests.count(self.NOVEMBER_URL) == 2
         assert sum(first_run_summary.new_games.values()) == 1
         assert sum(second_run_summary.new_games.values()) == 0
+
+    def test_skips_variants_in_saved_archive(
+        self, archive_month_json: str, make_chess_client: MakeChessClient, temp_db: Path
+    ) -> None:
+        response_by_url = {
+            ARCHIVE_LIST_URL: build_archive_list_response([self.NOVEMBER_URL]),
+            self.NOVEMBER_URL: Response(
+                codes.OK,
+                json=json.loads(archive_month_json),
+            ),
+        }
+
+        client, _ = self.make_client(make_chess_client, response_by_url)
+
+        summary = self.run_sync(chess_client=client, db_path=temp_db, months=2)
+
+        assert summary.game_variants == 1
+        assert sum(summary.new_games.values()) == 2
