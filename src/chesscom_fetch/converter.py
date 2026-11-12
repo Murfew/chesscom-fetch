@@ -93,6 +93,13 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
     if result_code is None:
         raise UnknownResultError(game.url, api_result_code)
 
+    opening = game_pgn.headers.get("Opening")
+    if opening is None:
+        opening_url = game_pgn.headers.get("ECOUrl")
+
+        if opening_url is not None:
+            opening = opening_url.split("/")[-1]
+
     return GameRow(
         url=str(game.url),
         username=username,
@@ -106,6 +113,8 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
         no_moves=(game_pgn.end().ply() + 1) // 2,
         pgn=game.pgn,
         fetch_date=fetch_date.isoformat(),
+        eco=game_pgn.headers.get("ECO"),
+        opening=opening,
     )
 
 

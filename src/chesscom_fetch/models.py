@@ -89,6 +89,8 @@ class GameRow(BaseModel):
     no_moves: NonNegativeInt = Field(le=MAX_NO_MOVES)
     pgn: str
     fetch_date: str  # YYYY-MM-DD
+    eco: str | None = None
+    opening: str | None = None
 
 
 class Game(BaseModel):

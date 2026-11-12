@@ -129,6 +129,24 @@ class TestGameToGameRow:
 
         assert exc_info.value.result_code == UNKNOWN_API_RESULT_CODE
 
+    def test_reads_eco_and_opening_from_pgn_tags(self, fake_game: Game) -> None:
+        game_row = game_to_game_row(TEST_USERNAME_WHITE, fake_game, TODAY)
+        assert game_row.eco == "B12"
+        assert game_row.opening == "Caro-Kann-Defense-Advance-Variation"
+
+    def test_leaves_eco_and_opening_empty_when_tags_missing(
+        self, fake_game: Game
+    ) -> None:
+        fake_game_without_eco_or_url = fake_game.model_copy(
+            update={"pgn": "1. e4 e5 *"}
+        )
+
+        game_row = game_to_game_row(
+            TEST_USERNAME_WHITE, fake_game_without_eco_or_url, TODAY
+        )
+        assert game_row.eco is None
+        assert game_row.opening is None
+
 
 class TestApiResultToResult:
     @pytest.mark.parametrize(
