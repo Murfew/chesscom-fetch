@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -38,10 +39,14 @@ def _as_cli_config(value: object) -> CliConfig:
     return value
 
 
-def _non_empty_lowercase_string(value: str) -> str:
+def _non_empty_lowercase_username(value: str) -> str:
     """Typer callback for names: reject blank text, else strip and lowercase it."""
     if not value.strip():
         raise typer.BadParameter("Value must not be empty.")
+    if not bool(re.fullmatch(r"[A-Za-z0-9_-]+", value)):
+        raise typer.BadParameter(
+            "Value can only be composed of letters, digits, '_' and '-'."
+        )
     return value.lower().strip()
 
 
@@ -221,7 +226,7 @@ def fetch(
     username: Annotated[
         str,
         typer.Argument(
-            callback=_non_empty_lowercase_string, help="Chess.com username."
+            callback=_non_empty_lowercase_username, help="Chess.com username."
         ),
     ],
     months: Annotated[

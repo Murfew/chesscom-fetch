@@ -143,6 +143,10 @@ class Archive(BaseModel):
             raise ValueError("'data' must be either a dict or a string.")  # ruff: ignore[type-check-without-type-error]: Pydantic only converts ValueError into ValidationError
 
         parsed = urlparse(url)
+
+        if parsed.hostname != "api.chess.com":
+            raise ValueError("archive URL must have api.chess.com host")
+
         try:
             year, month = [int(value) for value in parsed.path.split("/")[-2:]]
         except ValueError as err:

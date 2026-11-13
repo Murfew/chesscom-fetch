@@ -99,6 +99,11 @@ class TestFetch:
                 id="unknown-time-class",
             ),
             pytest.param([], "Missing argument 'username'", id="missing-username"),
+            pytest.param(
+                ["asdasd/asdad/"],
+                "Value can only be composed of letters, digits, '_' and '-'.",
+                id="bad-username",
+            ),
         ],
     )
     def test_rejects_invalid_arguments(
