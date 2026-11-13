@@ -7,6 +7,7 @@ from chesscom_fetch.converter import (
     UnknownResultError,
     UsernameMismatchError,
     VariantGameError,
+    _opening_family_from_url,
     api_result_to_result,
     game_to_game_row,
 )
@@ -129,12 +130,16 @@ class TestGameToGameRow:
 
         assert exc_info.value.result_code == UNKNOWN_API_RESULT_CODE
 
-    def test_reads_eco_and_opening_from_pgn_tags(self, fake_game: Game) -> None:
+    def test_stores_opening_fields_from_eco_headers(self, fake_game: Game) -> None:
         game_row = game_to_game_row(TEST_USERNAME_WHITE, fake_game, TODAY)
         assert game_row.eco == "B12"
-        assert game_row.opening == "Caro-Kann-Defense-Advance-Variation"
+        assert (
+            game_row.eco_url
+            == "https://www.chess.com/openings/Caro-Kann-Defense-Advance-Variation"
+        )
+        assert game_row.opening_family == "Caro Kann Defense"
 
-    def test_leaves_eco_and_opening_empty_when_tags_missing(
+    def test_defaults_opening_fields_when_eco_headers_missing(
         self, fake_game: Game
     ) -> None:
         fake_game_without_eco_or_url = fake_game.model_copy(
@@ -145,7 +150,8 @@ class TestGameToGameRow:
             TEST_USERNAME_WHITE, fake_game_without_eco_or_url, TODAY
         )
         assert game_row.eco is None
-        assert game_row.opening is None
+        assert game_row.eco_url is None
+        assert game_row.opening_family == "Unknown"
 
 
 class TestApiResultToResult:
@@ -178,3 +184,35 @@ class TestApiResultToResult:
 
     def test_returns_none_for_unknown_code(self) -> None:
         assert api_result_to_result(UNKNOWN_API_RESULT_CODE) is None
+
+
+class TestOpeningFamilyFromUrl:
+    @pytest.mark.parametrize(
+        ("url", "opening_family"),
+        [
+            pytest.param(
+                "Kings-Indian-Defense-Orthodox-Variation-6...c5-7.d5-Na6-8.O-O",
+                "Kings Indian Defense",
+                id="black's-move-notation",
+            ),
+            pytest.param(
+                "https://www.chess.com/openings/Kings-Gambit-Accepted-Modern-Defense-4.exd5-Bd6",
+                "Kings Gambit",
+                id="two-family-words",
+            ),
+            pytest.param(
+                "https://www.chess.com/openings/Unknown-Chess-Test",
+                "Unknown Chess",
+                id="no-family-words",
+            ),
+            pytest.param(
+                "https://www.chess.com/openings/Modern-Defense-Standard-Two-Knights-Suttles-Variation-5.Be3-Nf6-6.Qd2/",
+                "Modern Defense",
+                id="trailing-slash",
+            ),
+        ],
+    )
+    def test_extracts_opening_family_from_url(
+        self, url: str, opening_family: str
+    ) -> None:
+        assert _opening_family_from_url(url) == opening_family

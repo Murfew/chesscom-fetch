@@ -80,7 +80,8 @@ class GameRow(BaseModel):
     pgn: str
     fetch_date: str  # YYYY-MM-DD
     eco: str | None = None
-    opening: str | None = None
+    eco_url: str | None = None
+    opening_family: str = "Unknown"
 
 
 class Game(BaseModel):

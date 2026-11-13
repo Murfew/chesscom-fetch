@@ -57,7 +57,8 @@ def init_db(db_path: Path) -> None:
                 pgn TEXT NOT NULL,
                 fetch_date TEXT NOT NULL,
                 eco TEXT,
-                opening TEXT,
+                eco_url TEXT,
+                opening_family TEXT NOT NULL DEFAULT 'Unknown',
                 CONSTRAINT PK_games PRIMARY KEY (url, username)
             );
             """
@@ -149,7 +150,7 @@ def add_games(conn: Connection, games: Iterable[GameRow]) -> int:
         """
         INSERT INTO games VALUES
             (:url, :username, :end_date, :time_class, :rated, :colour, :result,
-            :white_rating, :black_rating, :no_moves, :pgn, :fetch_date, :eco, :opening)
+            :white_rating, :black_rating, :no_moves, :pgn, :fetch_date, :eco, :eco_url, :opening_family)
         ON CONFLICT DO NOTHING
         """,
         game_data,

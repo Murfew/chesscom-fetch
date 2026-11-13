@@ -50,6 +50,21 @@ class UsernameMismatchError(GameSkippedError):
         super().__init__(url, f"'{username}' isn't either player in this game")
 
 
+OPENING_FAMILY_WORDS = {"Opening", "Defense", "Game", "Gambit", "Attack", "System"}
+
+
+def _opening_family_from_url(url: str | None) -> str:
+    if url is None:
+        return "Unknown"
+
+    slug = url.rstrip("/").split("/")[-1].split("...")[0]
+    words = slug.split("-")
+    for i, w in enumerate(words):
+        if w in OPENING_FAMILY_WORDS:
+            return " ".join(words[: i + 1])
+    return " ".join(words[:2])
+
+
 def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
     """Convert a Chess.com API game into a games-table row from one player's side.
 
@@ -93,13 +108,6 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
     if result_code is None:
         raise UnknownResultError(game.url, api_result_code)
 
-    opening = game_pgn.headers.get("Opening")
-    if opening is None:
-        opening_url = game_pgn.headers.get("ECOUrl")
-
-        if opening_url is not None:
-            opening = opening_url.split("/")[-1]
-
     return GameRow(
         url=str(game.url),
         username=username,
@@ -114,7 +122,8 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
         pgn=game.pgn,
         fetch_date=fetch_date.isoformat(),
         eco=game_pgn.headers.get("ECO"),
-        opening=opening,
+        eco_url=game_pgn.headers.get("ECOUrl"),
+        opening_family=_opening_family_from_url(game_pgn.headers.get("ECOUrl")),
     )
 
 
