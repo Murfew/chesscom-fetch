@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from httpx2 import Response, codes
+from httpx2 import ConnectError, ConnectTimeout, Response, codes
 from pydantic import HttpUrl
 from typer.testing import CliRunner
 
@@ -19,10 +19,10 @@ from tests.helpers import (
 
 
 @pytest.mark.usefixtures("patch_get_today")
-class TestCli:
+class TestFetch:
     NOVEMBER_URL = build_archive_url(2026, 11)
 
-    def test_fetch_prints_summary(
+    def test_prints_summary(
         self, fake_game: Game, get_fetch_result: GetFetchResult
     ) -> None:
         response_by_url = {
@@ -38,21 +38,30 @@ class TestCli:
             line.strip().split() for line in result.stdout.splitlines()
         ]
 
-    def test_fetch_prints_one_line_on_fetch_error(
-        self, get_fetch_result: GetFetchResult
+    @pytest.mark.parametrize(
+        ("response"),
+        [
+            pytest.param(Response(codes.NOT_FOUND), id="not-found"),
+            pytest.param(
+                Response(codes.OK, text="not a json response"), id="non-json-body"
+            ),
+            pytest.param(
+                Response(codes.OK, json={"wrong-key": "some-value"}),
+                id="wrong-json-shape",
+            ),
+            pytest.param(ConnectTimeout("Timed out."), id="timeout"),
+            pytest.param(ConnectError("Connection error."), id="network-error"),
+        ],
+    )
+    def test_prints_one_line_on_fetch_error(
+        self, response: Response, get_fetch_result: GetFetchResult
     ) -> None:
-        response_by_url = {
-            ARCHIVE_LIST_URL: Response(codes.NOT_FOUND),
-        }
-
-        result = get_fetch_result(response_by_url)
-
+        result = get_fetch_result({ARCHIVE_LIST_URL: response})
         assert result.exit_code == 1
-        assert "ERROR:" in result.stderr
-        assert TEST_USERNAME_WHITE in result.stderr
         assert "Traceback" not in result.stderr
+        assert len(result.stderr.splitlines()) == 1
 
-    def test_fetch_filters_report_by_time_class(
+    def test_filters_report_by_time_class(
         self, fake_game: Game, get_fetch_result: GetFetchResult, temp_db: Path
     ) -> None:
         fake_blitz_game = fake_game.model_copy(
@@ -90,7 +99,7 @@ class TestCli:
             pytest.param([], "Missing argument 'username'", id="missing-username"),
         ],
     )
-    def test_fetch_rejects_invalid_arguments(
+    def test_rejects_invalid_arguments(
         self, arguments: list[str], expected_message: str, runner: CliRunner
     ) -> None:
         result = runner.invoke(app, ["fetch", *arguments])

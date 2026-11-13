@@ -1,5 +1,4 @@
 import json
-from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
@@ -27,6 +26,7 @@ from tests.helpers import (
     TEST_USERNAME_WHITE,
     UNKNOWN_API_RESULT_CODE,
     MakeChessClient,
+    ResponseByUrl,
     build_archive_list_response,
     build_archive_month_response,
     build_archive_url,
@@ -167,7 +167,7 @@ class TestSync:
     def make_client(
         self,
         make_chess_client: MakeChessClient,
-        response_by_url: Mapping[str, Response],
+        response_by_url: ResponseByUrl,
     ) -> tuple[ChessClient, list[str]]:
         requests: list[str] = []
         handler = build_handler(response_by_url, requests)

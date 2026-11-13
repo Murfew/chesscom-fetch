@@ -12,7 +12,8 @@ from chesscom_fetch.http import ChessClient
 from chesscom_fetch.models import Game
 
 type Handler = Callable[[Request], Response]
-type PatchGetChessClient = Callable[[Mapping[str, Response]], list[str]]
+type PatchGetChessClient = Callable[[ResponseByUrl], list[str]]
+type ResponseByUrl = Mapping[str, Response | Exception]
 
 TEST_USERNAME_WHITE = "testplayerwhite"
 TEST_USERNAME_BLACK = "testplayerblack"
@@ -38,7 +39,7 @@ class MakeChessClient(Protocol):
 class GetFetchResult(Protocol):
     def __call__(
         self,
-        response_by_url: Mapping[str, Response],
+        response_by_url: ResponseByUrl,
         extra_args: list[str] | None = ...,
     ) -> Result: ...
 
@@ -65,11 +66,14 @@ def count_games_table_rows(db_path: Path) -> int:
 
 
 def build_handler(
-    response_by_url: Mapping[str, Response], requests_record: list[str]
+    response_by_url: ResponseByUrl, requests_record: list[str]
 ) -> Handler:
     def _handler(request: Request) -> Response:
         requests_record.append(str(request.url))
-        return response_by_url.get(str(request.url), Response(codes.NOT_FOUND))
+        result = response_by_url.get(str(request.url), Response(codes.NOT_FOUND))
+        if isinstance(result, Exception):
+            raise result
+        return result
 
     return _handler
 

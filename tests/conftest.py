@@ -1,10 +1,9 @@
-from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from httpx2 import Client, MockTransport, Response
+from httpx2 import Client, MockTransport
 from pytest_mock import MockFixture
 from rich.console import Console
 from typer.testing import CliRunner, Result
@@ -22,6 +21,7 @@ from tests.helpers import (
     Handler,
     MakeChessClient,
     PatchGetChessClient,
+    ResponseByUrl,
     build_handler,
 )
 
@@ -72,7 +72,7 @@ def patch_get_chess_client(
     monkeypatch: pytest.MonkeyPatch,
     make_chess_client: MakeChessClient,
 ) -> PatchGetChessClient:
-    def _patch_get_chess_client(response_by_url: Mapping[str, Response]) -> list[str]:
+    def _patch_get_chess_client(response_by_url: ResponseByUrl) -> list[str]:
         requests_record: list[str] = []
         handler = build_handler(response_by_url, requests_record)
 
@@ -118,7 +118,7 @@ def get_fetch_result(
     patch_get_chess_client: PatchGetChessClient, runner: CliRunner
 ) -> GetFetchResult:
     def _get_fetch_result(
-        response_by_url: Mapping[str, Response], extra_args: list[str] | None = None
+        response_by_url: ResponseByUrl, extra_args: list[str] | None = None
     ) -> Result:
         patch_get_chess_client(response_by_url)
         return runner.invoke(app, ["fetch", TEST_USERNAME_WHITE, *(extra_args or [])])
