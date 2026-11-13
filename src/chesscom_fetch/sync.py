@@ -149,6 +149,11 @@ def sync(
         archive_month_response = chess_client.get_archive_month(archive.url, etag)
         if archive_month_response is None:
             summary.months_unchanged += 1
+            if _is_month_complete(archive, today):
+                with get_connection(db_path) as conn:
+                    add_archive_state(
+                        conn, ArchiveStateRow(url=archive.url, etag=etag, complete=True)
+                    )
             continue
 
         archive_month, new_etag = archive_month_response
