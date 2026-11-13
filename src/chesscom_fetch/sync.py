@@ -83,13 +83,14 @@ class SyncSummary:
     Attributes:
         new_games: Newly stored games, per time class.
         months_unchanged: Months Chess.com answered 304 Not Modified for.
-        months_skipped_completed: Months skipped without a request because
+        months_completed: Months skipped without a request because
             they can no longer change.
-        variants_skipped: Games skipped for not being standard chess.
+        game_variants: Games skipped for not being standard chess.
         unreadable_games: Games skipped because their PGN couldn't be read.
         username_mismatches: Games skipped because the player wasn't in them.
         unknown_result_codes: Result codes that couldn't be mapped, with how
             often each appeared.
+        other: Games skipped for any other reason.
     """
 
     new_games: Counter[TimeClass] = field(default_factory=Counter)
