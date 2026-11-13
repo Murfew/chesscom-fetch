@@ -37,6 +37,8 @@ class TestFetch:
         assert ["rapid", "1"] in [
             line.strip().split() for line in result.stdout.splitlines()
         ]
+        assert "Skipped" not in result.stdout
+        assert "Months" not in result.stdout
 
     @pytest.mark.parametrize(
         ("response"),

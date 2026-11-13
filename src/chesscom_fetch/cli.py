@@ -117,10 +117,11 @@ def _print_details_grid(summary: SyncSummary) -> None:
         months_info.append(f"{summary.months_unchanged} unchanged")
     if summary.months_completed != 0:
         months_info.append(f"{summary.months_completed} already complete")
-    details_grid.add_row(
-        "Months",
-        f"{' · '.join(months_info)}",
-    )
+    if len(months_info) != 0:
+        details_grid.add_row(
+            "Months",
+            f"{' · '.join(months_info)}",
+        )
 
     skipped_info = []
     if summary.game_variants != 0:
@@ -133,8 +134,8 @@ def _print_details_grid(summary: SyncSummary) -> None:
         )
     if summary.other != 0:
         skipped_info.append(f"[yellow]{summary.other}[/yellow] other")
-    skipped_info.append("[dim]all time classes[/dim]")
     if len(skipped_info) != 0:
+        skipped_info.append("[dim]all time classes[/dim]")
         details_grid.add_row(
             "Skipped",
             f"{' · '.join(skipped_info)}",
