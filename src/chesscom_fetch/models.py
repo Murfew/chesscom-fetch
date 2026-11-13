@@ -1,11 +1,9 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Self
+from typing import Annotated, Any
 from urllib.parse import urlparse
-from uuid import UUID
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -18,14 +16,6 @@ from pydantic import (
 
 MAX_RATING = 4_000
 MAX_NO_MOVES = 10_000
-
-
-def _both_colours(d: dict[Colour, float]) -> dict[Colour, float]:
-    """Reject an accuracies dict unless it has a value for both white and black."""
-    missing = set(Colour) - d.keys()
-    if missing:
-        raise ValueError(f"missing keys: {sorted(missing)}")
-    return d
 
 
 class TimeClass(StrEnum):
@@ -94,53 +84,25 @@ class GameRow(BaseModel):
 
 
 class Game(BaseModel):
-    """A single game as returned by the Chess.com API.
-
-    Optional fields are left out by the API when they don't apply: accuracies only
-    appears for analysed games, start_time only for daily games, and tournament or
-    match only for games played as part of one.
-    """
+    """A single game as returned by the Chess.com API."""
 
     url: HttpUrl
     pgn: str
-    time_control: str
     end_time: datetime
     rated: bool
-    accuracies: Annotated[dict[Colour, float], AfterValidator(_both_colours)] | None = (
-        None
-    )
-    tcn: str
-    uuid: UUID
-    initial_setup: str
-    fen: str
-    start_time: datetime | None = None
     time_class: TimeClass
     rules: str
     white: Player
     black: Player
     eco: HttpUrl | None = None
-    tournament: HttpUrl | None = None
-    match: HttpUrl | None = None
-
-    @model_validator(mode="after")
-    def check_start_time_before_end_time(self) -> Self:
-        """Reject games whose start_time is later than their end_time."""
-        if self.start_time is not None and self.start_time > self.end_time:
-            raise ValueError("Start time after end time")
-        return self
 
 
 class Player(BaseModel):
-    """One side of a game as returned by the API.
-
-    Holds the player's identity, their rating at the time, and their result code.
-    """
+    """One side of a game as returned by the API."""
 
     rating: NonNegativeInt = Field(le=MAX_RATING)
     result: str
-    id: HttpUrl = Field(alias="@id")
     username: Annotated[str, StringConstraints(to_lower=True, strip_whitespace=True)]
-    uuid: UUID
 
 
 class Archive(BaseModel):
