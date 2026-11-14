@@ -6,10 +6,12 @@ from pydantic import HttpUrl
 from typer.testing import CliRunner
 
 from chesscom_fetch.cli import app
-from chesscom_fetch.models import Game, TimeClass
+from chesscom_fetch.db import add_games, get_connection
+from chesscom_fetch.models import Game, Result, TimeClass
 from tests.helpers import (
     ARCHIVE_LIST_URL,
     TEST_USERNAME_WHITE,
+    BuildFakeGameRow,
     GetFetchResult,
     build_archive_list_response,
     build_archive_month_response,
@@ -112,3 +114,38 @@ class TestFetch:
         result = runner.invoke(app, ["fetch", *arguments])
         assert result.exit_code == 2
         assert expected_message in result.stderr
+
+
+class TestScore:
+    def test_prints_record(
+        self, build_fake_game_row: BuildFakeGameRow, temp_db: Path, runner: CliRunner
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.DRAW),
+                    build_fake_game_row(Result.LOSS),
+                ],
+            )
+
+        result = runner.invoke(app, ["score", TEST_USERNAME_WHITE])
+
+        assert result.exit_code == 0
+        assert TEST_USERNAME_WHITE in result.stdout
+        assert "4" in result.stdout
+
+        rows = [line.strip().split() for line in result.stdout.splitlines()]
+
+        assert ["wins", "2", "50.0%"] in rows
+        assert ["draws", "1", "25.0%"] in rows
+        assert ["losses", "1", "25.0%"] in rows
+        assert ["score", "2.5", "/", "4", "62.5%"] in rows
+
+    def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["score", TEST_USERNAME_WHITE])
+
+        assert result.exit_code == 0
+        assert f"No games saved for {TEST_USERNAME_WHITE}" in result.stdout

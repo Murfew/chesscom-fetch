@@ -1,5 +1,6 @@
 import re
 import sqlite3
+from dataclasses import asdict
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated, NamedTuple, NoReturn
@@ -274,3 +275,60 @@ def fetch(
             _handle_error(err, str(err))
 
     _print_summary(summary, time_classes, username, months, today)
+
+
+@app.command()
+def score(
+    ctx: typer.Context,
+    username: Annotated[
+        str,
+        typer.Argument(
+            callback=_non_empty_lowercase_username, help="Chess.com username."
+        ),
+    ],
+) -> None:
+    """Show a player's wins, draws, losses and score from saved games.
+
+    Run `fetch` first; this command reads only the local database.
+
+    \f
+    Args:
+        ctx: The Typer context; settings are read from `ctx.obj`.
+        username: Chess.com username, stripped and lowercased.
+    """  # ruff: ignore[escape-sequence-in-docstring]
+    config = _as_cli_config(ctx.obj)
+    record = db.get_record(config.db_path, username)
+
+    total_games = sum(asdict(record).values())
+    if total_games == 0:
+        console.print(
+            f"[dim]No games saved for {username}. Run `chesscom-fetch fetch {username}` to download them.[/dim]"
+        )
+        return
+
+    console.print(f"Record for [bold]{username}[/bold] · {total_games} games")
+    console.print()
+
+    score_grid = Table.grid(padding=(0, 2))
+    score_grid.add_column(style="dim")
+    score_grid.add_column(justify="right")
+    score_grid.add_column(justify="right")
+
+    score_grid.add_row(
+        "wins", str(record.wins), f"{record.wins / total_games:.1%}", style="green"
+    )
+    score_grid.add_row("draws", str(record.draws), f"{record.draws / total_games:.1%}")
+    score_grid.add_row(
+        "losses",
+        str(record.losses),
+        f"{record.losses / total_games:.1%}",
+        style="red",
+    )
+    score_grid.add_row()
+
+    score = record.wins + 0.5 * record.draws
+    score_grid.add_row(
+        "score", f"{score:g} / {total_games}", f"{score / total_games:.1%}"
+    )
+
+    console.print(score_grid)
