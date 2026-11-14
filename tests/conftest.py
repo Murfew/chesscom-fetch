@@ -1,4 +1,5 @@
 from datetime import date
+from itertools import count
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -130,9 +131,17 @@ def get_fetch_result(
 
 @pytest.fixture
 def build_fake_game_row(fake_game_row: GameRow) -> BuildFakeGameRow:
+    counter = count(1)
+
     def _build_fake_game_row(
         result: Result, username: str = TEST_USERNAME_WHITE
     ) -> GameRow:
-        return fake_game_row.model_copy(update={"result": result, "username": username})
+        return fake_game_row.model_copy(
+            update={
+                "url": f"https://www.chess.com/game/live/{next(counter)}",
+                "result": result,
+                "username": username,
+            }
+        )
 
     return _build_fake_game_row

@@ -187,7 +187,7 @@ class TestGetRecord:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(Result.WIN, TEST_USERNAME_WHITE),
+                    build_fake_game_row(Result.LOSS, TEST_USERNAME_WHITE),
                     build_fake_game_row(Result.WIN, TEST_USERNAME_BLACK),
                 ],
             )
