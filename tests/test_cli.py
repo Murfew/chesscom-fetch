@@ -134,8 +134,7 @@ class TestScore:
         result = runner.invoke(app, ["score", TEST_USERNAME_WHITE])
 
         assert result.exit_code == 0
-        assert TEST_USERNAME_WHITE in result.stdout
-        assert "4" in result.stdout
+        assert f"{TEST_USERNAME_WHITE} · 4 games" in result.stdout
 
         rows = [line.strip().split() for line in result.stdout.splitlines()]
 
