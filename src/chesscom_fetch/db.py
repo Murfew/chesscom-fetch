@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor, connect
 
-from chesscom_fetch.models import GameRow
+from chesscom_fetch.models import GameRow, Result
 
 
 @contextmanager
@@ -157,3 +157,46 @@ def add_games(conn: Connection, games: Iterable[GameRow]) -> int:
     )
 
     return cur.rowcount
+
+
+@dataclass
+class Record:
+    """A player's win, draw and loss counts across their stored games.
+
+    Attributes:
+        wins: Number of games the player won.
+        draws: Number of games that ended in a draw.
+        losses: Number of games the player lost.
+    """
+
+    wins: int = 0
+    draws: int = 0
+    losses: int = 0
+
+
+def get_record(db_path: Path, username: str) -> Record:
+    """Count a player's wins, draws and losses in the database.
+
+    Only games already saved by `fetch` are counted; nothing is downloaded.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        username: Chess.com username, lowercased to match stored rows.
+
+    Returns:
+        The player's record. Every count is 0 if no games are stored.
+    """
+    with get_connection(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT result, COUNT(*) AS count FROM games WHERE username = ? GROUP BY result
+            """,
+            (username,),
+        )
+        raw_counts = dict(cur.fetchall())
+        return Record(
+            wins=raw_counts.get(Result.WIN, 0),
+            draws=raw_counts.get(Result.DRAW, 0),
+            losses=raw_counts.get(Result.LOSS, 0),
+        )

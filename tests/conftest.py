@@ -6,17 +6,19 @@ import pytest
 from httpx2 import Client, MockTransport
 from pytest_mock import MockFixture
 from rich.console import Console
-from typer.testing import CliRunner, Result
+from typer.testing import CliRunner
+from typer.testing import Result as RunnerResult
 
 import chesscom_fetch.cli
 from chesscom_fetch import db
 from chesscom_fetch.cli import app
 from chesscom_fetch.converter import game_to_game_row
 from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Game, GameRow
+from chesscom_fetch.models import Game, GameRow, Result
 from tests.helpers import (
     TEST_FETCH_DATE,
     TEST_USERNAME_WHITE,
+    BuildFakeGameRow,
     GetFetchResult,
     Handler,
     MakeChessClient,
@@ -119,8 +121,18 @@ def get_fetch_result(
 ) -> GetFetchResult:
     def _get_fetch_result(
         response_by_url: ResponseByUrl, extra_args: list[str] | None = None
-    ) -> Result:
+    ) -> RunnerResult:
         patch_get_chess_client(response_by_url)
         return runner.invoke(app, ["fetch", TEST_USERNAME_WHITE, *(extra_args or [])])
 
     return _get_fetch_result
+
+
+@pytest.fixture
+def build_fake_game_row(fake_game_row: GameRow) -> BuildFakeGameRow:
+    def _build_fake_game_row(
+        result: Result, username: str = TEST_USERNAME_WHITE
+    ) -> GameRow:
+        return fake_game_row.model_copy(update={"result": result, "username": username})
+
+    return _build_fake_game_row

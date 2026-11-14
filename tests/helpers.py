@@ -5,15 +5,11 @@ from typing import Protocol
 from unittest.mock import MagicMock
 
 from httpx2 import Request, Response, codes
-from typer.testing import Result
+from typer.testing import Result as RunnerResult
 
 from chesscom_fetch.db import get_connection
 from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Game
-
-type Handler = Callable[[Request], Response]
-type PatchGetChessClient = Callable[[ResponseByUrl], list[str]]
-type ResponseByUrl = Mapping[str, Response | Exception]
+from chesscom_fetch.models import Game, GameRow, Result
 
 TEST_USERNAME_WHITE = "testplayerwhite"
 TEST_USERNAME_BLACK = "testplayerblack"
@@ -29,6 +25,10 @@ ARCHIVE_LIST_URL = (
 )
 UNKNOWN_API_RESULT_CODE = "unknown"
 
+type Handler = Callable[[Request], Response]
+type PatchGetChessClient = Callable[[ResponseByUrl], list[str]]
+type ResponseByUrl = Mapping[str, Response | Exception]
+
 
 class MakeChessClient(Protocol):
     def __call__(
@@ -41,7 +41,11 @@ class GetFetchResult(Protocol):
         self,
         response_by_url: ResponseByUrl,
         extra_args: list[str] | None = ...,
-    ) -> Result: ...
+    ) -> RunnerResult: ...
+
+
+class BuildFakeGameRow(Protocol):
+    def __call__(self, result: Result, username: str = ...) -> GameRow: ...
 
 
 def build_archive_month_response(

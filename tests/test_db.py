@@ -6,10 +6,12 @@ import pytest
 
 from chesscom_fetch.db import (
     ArchiveStateRow,
+    Record,
     add_archive_state,
     add_games,
     get_archive_state,
     get_connection,
+    get_record,
     init_db,
 )
 from chesscom_fetch.models import Colour, GameRow, Result, TimeClass
@@ -17,6 +19,8 @@ from tests.helpers import (
     TEST_ARCHIVE_MONTH_URLS,
     TEST_ETAG,
     TEST_USERNAME_BLACK,
+    TEST_USERNAME_WHITE,
+    BuildFakeGameRow,
     count_games_table_rows,
 )
 
@@ -147,3 +151,49 @@ class TestInitDb:
             add_games(conn, [updated_game_row])
 
         assert count_games_table_rows(temp_db) == 0
+
+
+class TestGetRecord:
+    def test_counts_each_result(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.DRAW),
+                    build_fake_game_row(Result.LOSS),
+                    build_fake_game_row(Result.LOSS),
+                ],
+            )
+
+        record = get_record(temp_db, TEST_USERNAME_WHITE)
+
+        assert record == Record(wins=3, draws=1, losses=2)
+
+    def test_returns_zeros_when_no_games(self, temp_db: Path) -> None:
+        record = get_record(temp_db, TEST_USERNAME_WHITE)
+
+        assert record == Record()
+
+    def test_counts_only_requested_player(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(Result.WIN, TEST_USERNAME_WHITE),
+                    build_fake_game_row(Result.WIN, TEST_USERNAME_BLACK),
+                ],
+            )
+
+        white_record = get_record(temp_db, TEST_USERNAME_WHITE)
+        black_record = get_record(temp_db, TEST_USERNAME_BLACK)
+
+        assert white_record == Record(losses=1)
+        assert black_record == Record(wins=1)
