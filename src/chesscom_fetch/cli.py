@@ -47,7 +47,7 @@ def _parse_username(value: str) -> str:
     """Typer callback for names: reject blank text, else strip and lowercase it."""
     if not value.strip():
         raise typer.BadParameter("Value must not be empty.")
-    if not bool(re.fullmatch(r"[A-Za-z0-9_-]+", value)):
+    if not bool(re.fullmatch(r"[A-Za-z0-9_-]+", value.strip())):
         raise typer.BadParameter(
             "Value can only be composed of letters, digits, '_' and '-'."
         )
