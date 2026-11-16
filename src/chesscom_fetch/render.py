@@ -5,8 +5,8 @@ from datetime import date
 from rich.console import Console
 from rich.table import Table
 
-from chesscom_fetch.domain import BAD_SCORE, GOOD_SCORE, TimeClass
-from chesscom_fetch.reports import Record
+from chesscom_fetch.domain import BAD_SCORE, GOOD_SCORE, Colour, TimeClass
+from chesscom_fetch.reports import OpeningRecord, Record
 from chesscom_fetch.sync import SyncSummary, first_month_in_window
 
 console = Console()
@@ -138,6 +138,29 @@ def _score_style(score: float) -> str:
     return "default"
 
 
+def _add_opening_rows(
+    grid: Table, colour: Colour, openings: list[OpeningRecord]
+) -> None:
+    """Add one colour's heading and opening rows to `grid`, or a no-games row."""
+    grid.add_row(
+        f"[bold]As {colour.capitalize()}", "[dim]games[/dim]", "[dim]score[/dim]"
+    )
+
+    if len(openings) == 0:
+        grid.add_row(f"[dim]  No games as {colour.capitalize()}.[/dim]")
+        return
+
+    for opening_record in openings:
+        score = opening_record.record.score
+        assert score is not None  # ruff: ignore[assert] -- every family from GROUP BY has at least one game
+        score_style = _score_style(score)
+        grid.add_row(
+            f"  {opening_record.opening_family}",
+            str(opening_record.record.total_games),
+            f"[{score_style}]{score:.1%}[/{score_style}]",
+        )
+
+
 def print_sync_summary(
     summary: SyncSummary,
     time_classes: list[TimeClass],
@@ -205,3 +228,34 @@ def print_record(username: str, record: Record) -> None:
     )
 
     console.print(record_grid)
+
+
+def print_top_openings(
+    username: str,
+    white_openings: list[OpeningRecord],
+    black_openings: list[OpeningRecord],
+    record: Record,
+) -> None:
+    """Print the five most-played opening families as White and as Black.
+
+    If the player has no saved games, print how to fetch them instead.
+
+    Args:
+        username: The player, for the header and the empty-state hint.
+        white_openings: Most-played families as White, most-played first.
+        black_openings: Most-played families as Black, most-played first.
+        record: The player's record across all saved games, for the header's
+            game count and to tell when there are no games at all.
+    """
+    if record.total_games == 0:
+        _print_no_games(username)
+        return
+
+    _print_report_header("Top openings", username, record.total_games)
+    console.print()
+
+    openings_grid = _report_grid()
+    _add_opening_rows(openings_grid, Colour.WHITE, white_openings)
+    openings_grid.add_row()
+    _add_opening_rows(openings_grid, Colour.BLACK, black_openings)
+    console.print(openings_grid)

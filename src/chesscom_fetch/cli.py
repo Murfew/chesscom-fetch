@@ -11,13 +11,14 @@ from httpx2 import Client
 
 from chesscom_fetch.client import ChessClient, ChessClientError
 from chesscom_fetch.database import init_db
-from chesscom_fetch.domain import TimeClass
+from chesscom_fetch.domain import Colour, TimeClass
 from chesscom_fetch.render import (
     err_console,
     print_record,
     print_sync_summary,
+    print_top_openings,
 )
-from chesscom_fetch.reports import get_record
+from chesscom_fetch.reports import get_most_played_openings, get_record
 from chesscom_fetch.sync import sync
 
 app = typer.Typer()
@@ -194,3 +195,29 @@ def score(
     """  # ruff: ignore[escape-sequence-in-docstring]
     config = _as_cli_config(ctx.obj)
     print_record(username, get_record(config.db_path, username))
+
+
+@app.command()
+def top_openings(
+    ctx: typer.Context,
+    username: Annotated[
+        str,
+        typer.Argument(callback=_parse_username, help="Chess.com username."),
+    ],
+) -> None:
+    """Show a player's five most-played opening families as White and as Black.
+
+    Score counts a win as 1 point and a draw as ½, as a percentage of
+    games played. Run `fetch` first; this command reads only the local
+    database.
+
+    \f
+    Args:
+        ctx: The Typer context; settings are read from `ctx.obj`.
+        username: Chess.com username, stripped and lowercased.
+    """  # ruff: ignore[escape-sequence-in-docstring]
+    config = _as_cli_config(ctx.obj)
+    record = get_record(config.db_path, username)
+    white_openings = get_most_played_openings(config.db_path, username, Colour.WHITE)
+    black_openings = get_most_played_openings(config.db_path, username, Colour.BLACK)
+    print_top_openings(username, white_openings, black_openings, record)

@@ -8,11 +8,17 @@ from typer.testing import CliRunner
 from chesscom_fetch.api_models import Game
 from chesscom_fetch.cli import app
 from chesscom_fetch.database import get_connection
-from chesscom_fetch.domain import Result, TimeClass
+from chesscom_fetch.domain import Colour, Result, TimeClass
 from chesscom_fetch.sync_store import add_games
 from tests.helpers import (
     ARCHIVE_LIST_URL,
+    CARO_KANN_DEFENSE,
+    FRENCH_DEFENSE,
+    LONDON_SYSTEM,
+    SCANDINAVIAN_DEFENSE,
+    SICILIAN_DEFENSE,
     USERNAME_WHITE,
+    VIENNA_GAMBIT,
     BuildFakeGameRow,
     RunFetch,
     build_archive_list_response,
@@ -145,6 +151,86 @@ class TestScore:
 
     def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["score", USERNAME_WHITE])
+
+        assert result.exit_code == 0
+        assert f"No games saved for {USERNAME_WHITE}" in result.stdout
+
+
+class TestTopOpenings:
+    def test_prints_openings_by_colour(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow, runner: CliRunner
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        colour=Colour.BLACK,
+                        opening_family=CARO_KANN_DEFENSE,
+                        result=Result.WIN,
+                    ),
+                    build_fake_game_row(
+                        colour=Colour.BLACK,
+                        opening_family=SCANDINAVIAN_DEFENSE,
+                        result=Result.DRAW,
+                    ),
+                    build_fake_game_row(
+                        colour=Colour.BLACK,
+                        opening_family=SICILIAN_DEFENSE,
+                        result=Result.LOSS,
+                    ),
+                    build_fake_game_row(
+                        colour=Colour.BLACK,
+                        opening_family=VIENNA_GAMBIT,
+                        result=Result.WIN,
+                    ),
+                    build_fake_game_row(
+                        colour=Colour.BLACK,
+                        opening_family=LONDON_SYSTEM,
+                        result=Result.WIN,
+                    ),
+                    build_fake_game_row(
+                        colour=Colour.BLACK,
+                        opening_family=FRENCH_DEFENSE,
+                        result=Result.WIN,
+                    ),
+                    build_fake_game_row(
+                        colour=Colour.WHITE,
+                        opening_family=LONDON_SYSTEM,
+                        result=Result.LOSS,
+                    ),
+                ],
+            )
+
+        result = runner.invoke(app, ["top-openings", USERNAME_WHITE])
+
+        assert result.exit_code == 0
+        assert f"{USERNAME_WHITE} · 7 games" in result.stdout
+
+        rows = [line.strip().split() for line in result.stdout.splitlines()]
+
+        assert ["As", "White", "games", "score"] in rows
+        assert ["As", "Black", "games", "score"] in rows
+        assert [*CARO_KANN_DEFENSE.split(" "), "1", "100.0%"] in rows
+        assert [*SCANDINAVIAN_DEFENSE.split(" "), "1", "50.0%"] in rows
+        assert [*SICILIAN_DEFENSE.split(" "), "1", "0.0%"] in rows
+        assert [*VIENNA_GAMBIT.split(" "), "1", "100.0%"] not in rows
+        assert [*LONDON_SYSTEM.split(" "), "1", "100.0%"] in rows
+        assert [*FRENCH_DEFENSE.split(" "), "1", "100.0%"] in rows
+        assert [*LONDON_SYSTEM.split(" "), "1", "0.0%"] in rows
+
+    def test_prints_no_games_row_for_missing_colour(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow, runner: CliRunner
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(conn, [build_fake_game_row()])
+
+        result = runner.invoke(app, ["top-openings", USERNAME_WHITE])
+        assert result.exit_code == 0
+        assert "No games as Black." in result.stdout
+
+    def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["top-openings", USERNAME_WHITE])
 
         assert result.exit_code == 0
         assert f"No games saved for {USERNAME_WHITE}" in result.stdout
