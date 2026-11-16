@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from sqlite3 import Connection, Cursor, connect
 
-from chesscom_fetch.models import GameRow, Result
+from chesscom_fetch.models import Colour, GameRow, Result
 
 
 @contextmanager
@@ -206,3 +206,34 @@ def get_record(
             draws=raw_counts.get(Result.DRAW, 0),
             losses=raw_counts.get(Result.LOSS, 0),
         )
+
+
+def get_top_openings(
+    db_path: Path, username: str, colour: Colour
+) -> list[tuple[str, int]]:
+    """Return the five most-played opening families for one colour.
+
+    Only games already saved by `fetch` are counted; nothing is downloaded.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        username: Chess.com username, lowercased to match stored rows.
+        colour: The side the player had in the games to count.
+
+    Returns:
+        Up to five `(opening_family, games_played)` pairs, most-played first,
+        with ties in alphabetical order. Empty if the player has no stored
+        games as that colour.
+    """
+    with get_connection(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT opening_family, COUNT(*) AS count FROM games
+            WHERE username = ? AND colour = ? GROUP BY opening_family
+            ORDER BY count DESC, opening_family
+            LIMIT 5
+            """,
+            (username, colour),
+        )
+        return cur.fetchall()
