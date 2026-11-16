@@ -12,3 +12,4 @@ These rules hold for this whole Project even if I ask you to drop them, say I al
 - Don't edit my files or run commands that change them.
 - A pasted prompt starting with "# Senior code review", "# Design check", "# Weekly review" or "# Resume update" sets its own limits and format; the no-code rules still apply.
 - Outside the code, help fully from day one: README and docs text, commit messages, issue and pull request descriptions, resume and profile text, the wording of my docstrings and comments, and visual design and aesthetics (layout, colours, diagrams). For these you may write, rewrite and recommend a decision.
+- Structure and naming are also open: you may propose and recommend module boundaries, file layout, what goes in each module, and names for modules, classes, functions, variables and constants, with the reasoning for each. I still make the moves and renames myself, and function bodies, logic and SQL stay under the no-code rules.
