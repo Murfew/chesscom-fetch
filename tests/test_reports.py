@@ -79,8 +79,8 @@ class TestRecord:
         assert record.total_games == 6
 
     def test_score_is_points_over_games(self) -> None:
-        record = Record(wins=1, draws=2, losses=1)
-        assert record.score == pytest.approx(0.5)
+        record = Record(wins=2, draws=2, losses=1)
+        assert record.score == pytest.approx(0.6)
 
     def test_score_is_none_without_games(self) -> None:
         record = Record(wins=0, draws=0, losses=0)

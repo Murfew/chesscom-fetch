@@ -214,7 +214,7 @@ class TestTopOpenings:
         assert [*CARO_KANN_DEFENSE.split(" "), "1", "100.0%"] in rows
         assert [*SCANDINAVIAN_DEFENSE.split(" "), "1", "50.0%"] in rows
         assert [*SICILIAN_DEFENSE.split(" "), "1", "0.0%"] in rows
-        assert [*VIENNA_GAMBIT.split(" "), "1", "100.0%"] not in rows
+        assert VIENNA_GAMBIT not in result.stdout
         assert [*LONDON_SYSTEM.split(" "), "1", "100.0%"] in rows
         assert [*FRENCH_DEFENSE.split(" "), "1", "100.0%"] in rows
         assert [*LONDON_SYSTEM.split(" "), "1", "0.0%"] in rows
