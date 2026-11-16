@@ -5,14 +5,16 @@ from httpx2 import ConnectError, ConnectTimeout, Response, codes
 from pydantic import HttpUrl
 from typer.testing import CliRunner
 
+from chesscom_fetch.api_models import Game
 from chesscom_fetch.cli import app
-from chesscom_fetch.db import add_games, get_connection
-from chesscom_fetch.models import Game, Result, TimeClass
+from chesscom_fetch.database import get_connection
+from chesscom_fetch.domain import Result, TimeClass
+from chesscom_fetch.sync_store import add_games
 from tests.helpers import (
     ARCHIVE_LIST_URL,
-    TEST_USERNAME_WHITE,
+    USERNAME_WHITE,
     BuildFakeGameRow,
-    GetFetchResult,
+    RunFetch,
     build_archive_list_response,
     build_archive_month_response,
     build_archive_url,
@@ -20,22 +22,20 @@ from tests.helpers import (
 )
 
 
-@pytest.mark.usefixtures("patch_get_today")
+@pytest.mark.usefixtures("patch_today_utc")
 class TestFetch:
     NOVEMBER_URL = build_archive_url(2026, 11)
 
-    def test_prints_summary(
-        self, fake_game: Game, get_fetch_result: GetFetchResult
-    ) -> None:
+    def test_prints_summary(self, fake_game: Game, run_fetch: RunFetch) -> None:
         response_by_url = {
             ARCHIVE_LIST_URL: build_archive_list_response([self.NOVEMBER_URL]),
             self.NOVEMBER_URL: build_archive_month_response([fake_game]),
         }
 
-        result = get_fetch_result(response_by_url)
+        result = run_fetch(response_by_url)
 
         assert result.exit_code == 0
-        assert f"Synced {TEST_USERNAME_WHITE}" in result.stdout
+        assert f"Synced {USERNAME_WHITE}" in result.stdout
         assert ["rapid", "1"] in [
             line.strip().split() for line in result.stdout.splitlines()
         ]
@@ -58,15 +58,15 @@ class TestFetch:
         ],
     )
     def test_prints_one_line_on_fetch_error(
-        self, response: Response, get_fetch_result: GetFetchResult
+        self, response: Response, run_fetch: RunFetch
     ) -> None:
-        result = get_fetch_result({ARCHIVE_LIST_URL: response})
+        result = run_fetch({ARCHIVE_LIST_URL: response})
         assert result.exit_code == 1
         assert "Traceback" not in result.stderr
         assert len(result.stderr.splitlines()) == 1
 
-    def test_filters_report_by_time_class(
-        self, fake_game: Game, get_fetch_result: GetFetchResult, temp_db: Path
+    def test_filters_summary_by_time_class(
+        self, fake_game: Game, run_fetch: RunFetch, temp_db: Path
     ) -> None:
         fake_blitz_game = fake_game.model_copy(
             update={
@@ -82,7 +82,7 @@ class TestFetch:
             ),
         }
 
-        result = get_fetch_result(response_by_url, ["--time-class", TimeClass.RAPID])
+        result = run_fetch(response_by_url, ["--time-class", TimeClass.RAPID])
         assert TimeClass.RAPID in result.stdout
         assert TimeClass.BLITZ not in result.stdout
         assert count_games_table_rows(temp_db) == 2
@@ -91,12 +91,12 @@ class TestFetch:
         ("arguments", "expected_message"),
         [
             pytest.param(
-                [TEST_USERNAME_WHITE, "--months", "0"],
+                [USERNAME_WHITE, "--months", "0"],
                 "Invalid value for '--months'",
                 id="months-below-one",
             ),
             pytest.param(
-                [TEST_USERNAME_WHITE, "--time-class", "unknown"],
+                [USERNAME_WHITE, "--time-class", "unknown"],
                 "Invalid value for '--time-class'",
                 id="unknown-time-class",
             ),
@@ -131,10 +131,10 @@ class TestScore:
                 ],
             )
 
-        result = runner.invoke(app, ["score", TEST_USERNAME_WHITE])
+        result = runner.invoke(app, ["score", USERNAME_WHITE])
 
         assert result.exit_code == 0
-        assert f"{TEST_USERNAME_WHITE} · 4 games" in result.stdout
+        assert f"{USERNAME_WHITE} · 4 games" in result.stdout
 
         rows = [line.strip().split() for line in result.stdout.splitlines()]
 
@@ -144,7 +144,7 @@ class TestScore:
         assert ["score", "2.5", "/", "4", "62.5%"] in rows
 
     def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
-        result = runner.invoke(app, ["score", TEST_USERNAME_WHITE])
+        result = runner.invoke(app, ["score", USERNAME_WHITE])
 
         assert result.exit_code == 0
-        assert f"No games saved for {TEST_USERNAME_WHITE}" in result.stdout
+        assert f"No games saved for {USERNAME_WHITE}" in result.stdout

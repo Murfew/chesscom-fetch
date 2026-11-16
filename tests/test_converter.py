@@ -1,32 +1,30 @@
-from datetime import date
-
 import pytest
 
+from chesscom_fetch.api_models import APIResult, Game
 from chesscom_fetch.converter import (
-    BadPGNError,
     UnknownResultError,
+    UnreadablePGNError,
     UsernameMismatchError,
     VariantGameError,
     _opening_family_from_url,
     api_result_to_result,
     game_to_game_row,
 )
-from chesscom_fetch.models import APIResult, Colour, Game, Result
+from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result
 from tests.helpers import (
-    TEST_USERNAME_BLACK,
-    TEST_USERNAME_WHITE,
+    FETCH_DATE,
     UNKNOWN_API_RESULT_CODE,
+    USERNAME_BLACK,
+    USERNAME_WHITE,
 )
-
-TODAY = date.fromisoformat("2026-10-24")
 
 
 class TestGameToGameRow:
     @pytest.mark.parametrize(
         ("username", "expected_colour", "expected_result"),
         [
-            pytest.param(TEST_USERNAME_WHITE, Colour.WHITE, Result.LOSS),
-            pytest.param(TEST_USERNAME_BLACK, Colour.BLACK, Result.WIN),
+            pytest.param(USERNAME_WHITE, Colour.WHITE, Result.LOSS),
+            pytest.param(USERNAME_BLACK, Colour.BLACK, Result.WIN),
         ],
     )
     def test_sets_colour_from_username(
@@ -36,7 +34,7 @@ class TestGameToGameRow:
         expected_colour: Colour,
         expected_result: Result,
     ) -> None:
-        game_row = game_to_game_row(username, fake_game, TODAY)
+        game_row = game_to_game_row(username, fake_game, FETCH_DATE)
         assert game_row.colour == expected_colour
         assert game_row.result == expected_result
 
@@ -46,12 +44,12 @@ class TestGameToGameRow:
         with pytest.raises(
             UsernameMismatchError, match=f"{fake_game.url}.*{bad_username}"
         ) as exc_info:
-            game_to_game_row(bad_username, fake_game, TODAY)
+            game_to_game_row(bad_username, fake_game, FETCH_DATE)
 
         assert exc_info.value.username == bad_username
 
     @pytest.mark.parametrize(
-        ("new_pgn", "expected_no_moves"),
+        ("new_pgn", "expected_move_count"),
         [
             pytest.param(
                 "*",
@@ -71,13 +69,13 @@ class TestGameToGameRow:
         ],
     )
     def test_counts_moves(
-        self, fake_game: Game, new_pgn: str, expected_no_moves: int
+        self, fake_game: Game, new_pgn: str, expected_move_count: int
     ) -> None:
         fake_game_with_modified_moves = fake_game.model_copy(update={"pgn": new_pgn})
         game_row = game_to_game_row(
-            TEST_USERNAME_WHITE, fake_game_with_modified_moves, TODAY
+            USERNAME_WHITE, fake_game_with_modified_moves, FETCH_DATE
         )
-        assert game_row.no_moves == expected_no_moves
+        assert game_row.move_count == expected_move_count
 
     @pytest.mark.parametrize(
         "bad_pgn",
@@ -92,8 +90,10 @@ class TestGameToGameRow:
     def test_rejects_invalid_pgn(self, fake_game: Game, bad_pgn: str) -> None:
         fake_game_with_illegal_pgn = fake_game.model_copy(update={"pgn": bad_pgn})
 
-        with pytest.raises(BadPGNError, match=f"{fake_game.url}.*PGN") as exc_info:
-            game_to_game_row(TEST_USERNAME_WHITE, fake_game_with_illegal_pgn, TODAY)
+        with pytest.raises(
+            UnreadablePGNError, match=f"{fake_game.url}.*PGN"
+        ) as exc_info:
+            game_to_game_row(USERNAME_WHITE, fake_game_with_illegal_pgn, FETCH_DATE)
 
         assert exc_info.value.pgn == fake_game_with_illegal_pgn.pgn
 
@@ -107,7 +107,7 @@ class TestGameToGameRow:
             match=f"{fake_game_with_invalid_game_rules.url}.*{fake_game_with_invalid_game_rules.rules}",
         ) as exc_info:
             game_to_game_row(
-                TEST_USERNAME_WHITE, fake_game_with_invalid_game_rules, TODAY
+                USERNAME_WHITE, fake_game_with_invalid_game_rules, FETCH_DATE
             )
 
         assert exc_info.value.rules == fake_game_with_invalid_game_rules.rules
@@ -125,13 +125,13 @@ class TestGameToGameRow:
             match=f"{fake_game_with_unknown_result_code.url}.*{fake_game_with_unknown_result_code.white.result}",
         ) as exc_info:
             game_to_game_row(
-                TEST_USERNAME_WHITE, fake_game_with_unknown_result_code, TODAY
+                USERNAME_WHITE, fake_game_with_unknown_result_code, FETCH_DATE
             )
 
         assert exc_info.value.result_code == UNKNOWN_API_RESULT_CODE
 
     def test_stores_opening_fields_from_eco_headers(self, fake_game: Game) -> None:
-        game_row = game_to_game_row(TEST_USERNAME_WHITE, fake_game, TODAY)
+        game_row = game_to_game_row(USERNAME_WHITE, fake_game, FETCH_DATE)
         assert game_row.eco == "B12"
         assert (
             game_row.eco_url
@@ -147,11 +147,11 @@ class TestGameToGameRow:
         )
 
         game_row = game_to_game_row(
-            TEST_USERNAME_WHITE, fake_game_without_eco_or_url, TODAY
+            USERNAME_WHITE, fake_game_without_eco_or_url, FETCH_DATE
         )
         assert game_row.eco is None
         assert game_row.eco_url is None
-        assert game_row.opening_family == "Unknown"
+        assert game_row.opening_family == UNKNOWN_OPENING_FAMILY
 
 
 class TestApiResultToResult:

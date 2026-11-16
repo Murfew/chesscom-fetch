@@ -1,10 +1,14 @@
+"""Turn Chess.com games into database rows, or say why a game is skipped."""
+
 import io
 from datetime import date
 
 import chess.pgn
 from pydantic import HttpUrl
 
-from chesscom_fetch.models import APIResult, Colour, Game, GameRow, Result
+from chesscom_fetch.api_models import APIResult, Game
+from chesscom_fetch.database import GameRow
+from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result
 
 STANDARD_CHESS_RULES_CODE = "chess"
 
@@ -34,7 +38,7 @@ class UnknownResultError(GameSkippedError):
         super().__init__(url, f"unknown result code '{result_code}'")
 
 
-class BadPGNError(GameSkippedError):
+class UnreadablePGNError(GameSkippedError):
     """Raised when a game's PGN is missing or can't be parsed."""
 
     def __init__(self, url: HttpUrl, pgn: str) -> None:
@@ -54,8 +58,19 @@ OPENING_FAMILY_WORDS = {"Opening", "Defense", "Game", "Gambit", "Attack", "Syste
 
 
 def _opening_family_from_url(url: str | None) -> str:
+    """Name the opening family from a Chess.com ECO URL.
+
+    Args:
+        url: The game's `ECOUrl`, such as
+            ".../openings/Sicilian-Defense-Najdorf-Variation-6.Be3", or None.
+
+    Returns:
+        The slug's words up to and including the first family word such as
+        "Defense" or "Gambit", so "Sicilian Defense". If there's no family
+        word, its first two words. "Unknown" if `url` is None.
+    """
     if url is None:
-        return "Unknown"
+        return UNKNOWN_OPENING_FAMILY
 
     slug = url.rstrip("/").split("/")[-1].split("...")[0]
     words = slug.split("-")
@@ -81,7 +96,7 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
 
     Raises:
         VariantGameError: The game isn't standard chess.
-        BadPGNError: The PGN contains no game or has parse errors.
+        UnreadablePGNError: The PGN contains no game or has parse errors.
         UsernameMismatchError: `username` is neither player in the game.
         UnknownResultError: The player's result code isn't one we can map.
     """
@@ -92,9 +107,8 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
 
     game_pgn = chess.pgn.read_game(io.StringIO(game.pgn))
     if game_pgn is None or game_pgn.errors:
-        raise BadPGNError(game.url, game.pgn)
+        raise UnreadablePGNError(game.url, game.pgn)
 
-    colour: Colour
     if game.white.username == username:
         colour = Colour.WHITE
     elif game.black.username == username:
@@ -118,7 +132,7 @@ def game_to_game_row(username: str, game: Game, fetch_date: date) -> GameRow:
         result=result_code,
         white_rating=game.white.rating,
         black_rating=game.black.rating,
-        no_moves=(game_pgn.end().ply() + 1) // 2,
+        move_count=(game_pgn.end().ply() + 1) // 2,
         pgn=game.pgn,
         fetch_date=fetch_date.isoformat(),
         eco=game_pgn.headers.get("ECO"),

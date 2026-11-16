@@ -1,3 +1,5 @@
+"""Bring the database up to date with a player's Chess.com archives."""
+
 from calendar import DECEMBER
 from collections import Counter, defaultdict
 from collections.abc import Mapping
@@ -5,37 +7,47 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from chesscom_fetch.api_models import Archive, Game
+from chesscom_fetch.client import ChessClient
 from chesscom_fetch.converter import (
-    BadPGNError,
     GameSkippedError,
     UnknownResultError,
+    UnreadablePGNError,
     UsernameMismatchError,
     VariantGameError,
     game_to_game_row,
 )
-from chesscom_fetch.db import (
+from chesscom_fetch.database import GameRow, get_connection
+from chesscom_fetch.domain import TimeClass
+from chesscom_fetch.sync_store import (
     ArchiveStateRow,
-    add_archive_state,
     add_games,
     get_archive_state,
-    get_connection,
+    upsert_archive_state,
 )
-from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Archive, Game, GameRow, TimeClass
 
 MONTHS_PER_YEAR = 12
 
 
-def get_first_month_in_window(today: date, months: int) -> tuple[int, int]:
-    """Return the (year, month) the `months` window starts at, counting this month."""
-    total = today.year * 12 + today.month - months
-    year, month = divmod(total, 12)
+def first_month_in_window(today: date, months: int) -> tuple[int, int]:
+    """Find the first month of a window of months that ends with this one.
+
+    Args:
+        today: Today's date; its month is the last month of the window.
+        months: How many months the window covers, including this one.
+
+    Returns:
+        The window's first month as (year, month), so 3 months from
+        November 2026 gives (2026, 9).
+    """
+    total = today.year * MONTHS_PER_YEAR + today.month - months
+    year, month = divmod(total, MONTHS_PER_YEAR)
     return year, month + 1
 
 
 def _is_archive_in_window(months: int, archive: Archive, today: date) -> bool:
-    """Return whether an archive is within the last months months, inclusive."""
-    return (archive.year, archive.month) >= get_first_month_in_window(today, months)
+    """Return whether an archive falls in the months window, counting this month."""
+    return (archive.year, archive.month) >= first_month_in_window(today, months)
 
 
 def _is_month_complete(archive: Archive, today: date) -> bool:
@@ -52,9 +64,10 @@ def _is_month_complete(archive: Archive, today: date) -> bool:
     return today >= target_date
 
 
-def _group_games_by_time_class(
+def _convert_games_by_time_class(
     games: list[Game], username: str, today: date, summary: SyncSummary
 ) -> Mapping[TimeClass, list[GameRow]]:
+    """Convert games to rows by time class, counting skipped games in `summary`."""
     game_rows_by_time_class: defaultdict[TimeClass, list[GameRow]] = defaultdict(list)
 
     for game in games:
@@ -64,7 +77,7 @@ def _group_games_by_time_class(
             summary.game_variants += 1
         except UnknownResultError as err:
             summary.unknown_result_codes[err.result_code] += 1
-        except BadPGNError:
+        except UnreadablePGNError:
             summary.unreadable_games += 1
         except UsernameMismatchError:
             summary.username_mismatches += 1
@@ -131,7 +144,7 @@ def sync(
     """
     summary = SyncSummary()
 
-    archive_list = chess_client.get_archive_list()
+    archive_list = chess_client.fetch_archive_list()
     for archive in archive_list.archives:
         if not _is_archive_in_window(months, archive, today):
             continue
@@ -147,23 +160,23 @@ def sync(
                 continue
             etag = month_state.etag
 
-        archive_month_response = chess_client.get_archive_month(archive.url, etag)
+        archive_month_response = chess_client.fetch_archive_month(archive.url, etag)
         if archive_month_response is None:
             summary.months_unchanged += 1
             if _is_month_complete(archive, today):
                 with get_connection(db_path) as conn:
-                    add_archive_state(
+                    upsert_archive_state(
                         conn, ArchiveStateRow(url=archive.url, etag=etag, complete=True)
                     )
             continue
 
         archive_month, new_etag = archive_month_response
-        game_rows_by_time_class = _group_games_by_time_class(
+        game_rows_by_time_class = _convert_games_by_time_class(
             archive_month.games, username, today, summary
         )
 
         with get_connection(db_path) as conn:
-            add_archive_state(
+            upsert_archive_state(
                 conn,
                 ArchiveStateRow(
                     url=archive.url,

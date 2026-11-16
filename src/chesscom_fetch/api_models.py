@@ -1,3 +1,5 @@
+"""Pydantic models that mirror the JSON from Chess.com's Published-Data API."""
+
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
@@ -5,7 +7,6 @@ from urllib.parse import urlparse
 
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     HttpUrl,
     NonNegativeInt,
@@ -14,32 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-MAX_RATING = 4_000
-MAX_NO_MOVES = 10_000
-
-
-class TimeClass(StrEnum):
-    """Chess.com time controls, matching the API's time_class values."""
-
-    BULLET = "bullet"
-    BLITZ = "blitz"
-    RAPID = "rapid"
-    DAILY = "daily"
-
-
-class Colour(StrEnum):
-    """The side a player took in a game."""
-
-    BLACK = "black"
-    WHITE = "white"
-
-
-class Result(StrEnum):
-    """Outcome of a game from one player's perspective."""
-
-    WIN = "win"
-    LOSS = "loss"
-    DRAW = "draw"
+from chesscom_fetch.domain import MAX_RATING, TimeClass
 
 
 class APIResult(StrEnum):
@@ -60,28 +36,6 @@ class APIResult(StrEnum):
     THREECHECK = "threecheck"
     TIMEVSINSUFFICIENT = "timevsinsufficient"
     BUGHOUSEPARTNERLOSE = "bughousepartnerlose"
-
-
-class GameRow(BaseModel):
-    """One row of the games table, seen from the fetched player's side (username)."""
-
-    model_config = ConfigDict(frozen=True)
-
-    url: str
-    username: str
-    end_date: str  # YYYY-MM-DD
-    time_class: TimeClass
-    rated: bool
-    colour: Colour
-    result: Result
-    white_rating: NonNegativeInt = Field(le=MAX_RATING)
-    black_rating: NonNegativeInt = Field(le=MAX_RATING)
-    no_moves: NonNegativeInt = Field(le=MAX_NO_MOVES)
-    pgn: str
-    fetch_date: str  # YYYY-MM-DD
-    eco: str | None = None
-    eco_url: str | None = None
-    opening_family: str = "Unknown"
 
 
 class Game(BaseModel):

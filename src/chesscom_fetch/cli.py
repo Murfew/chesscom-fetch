@@ -1,26 +1,29 @@
+"""Typer commands and options that connect sync and the reports to the terminal."""
+
 import re
 import sqlite3
-from dataclasses import asdict
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated, NamedTuple, NoReturn
 
 import typer
 from httpx2 import Client
-from rich.console import Console
-from rich.table import Table
 
-from chesscom_fetch import db
-from chesscom_fetch.http import ChessClient, ChessFetcherError
-from chesscom_fetch.models import TimeClass
-from chesscom_fetch.sync import SyncSummary, get_first_month_in_window, sync
+from chesscom_fetch.client import ChessClient, ChessClientError
+from chesscom_fetch.database import init_db
+from chesscom_fetch.domain import TimeClass
+from chesscom_fetch.render import (
+    err_console,
+    print_record,
+    print_sync_summary,
+)
+from chesscom_fetch.reports import get_record
+from chesscom_fetch.sync import sync
 
 app = typer.Typer()
 
-console = Console()
-err_console = Console(stderr=True)
 
-DATABASE_PATH = Path(typer.get_app_dir("chesscom-fetch")) / "app.db"
+DEFAULT_DB_PATH = Path(typer.get_app_dir("chesscom-fetch")) / "app.db"
 
 
 class CliConfig(NamedTuple):
@@ -40,7 +43,7 @@ def _as_cli_config(value: object) -> CliConfig:
     return value
 
 
-def _non_empty_lowercase_username(value: str) -> str:
+def _parse_username(value: str) -> str:
     """Typer callback for names: reject blank text, else strip and lowercase it."""
     if not value.strip():
         raise typer.BadParameter("Value must not be empty.")
@@ -51,12 +54,12 @@ def _non_empty_lowercase_username(value: str) -> str:
     return value.lower().strip()
 
 
-def _get_chess_client(http_client: Client, username: str) -> ChessClient:
+def _make_chess_client(http_client: Client, username: str) -> ChessClient:
     """Build the Chess.com client; a separate function so tests can swap in a mock."""
     return ChessClient(http_client, username)
 
 
-def _get_today() -> date:
+def _today_utc() -> date:
     """Return today's date in UTC; a separate function so tests can fix the date."""
     return datetime.now(tz=UTC).date()
 
@@ -65,111 +68,6 @@ def _handle_error(err: Exception, message: str) -> NoReturn:
     """Print a one-line error to stderr and exit with code 1, chained to the cause."""
     err_console.print(f"[red]ERROR:[/red] {message}")
     raise typer.Exit(1) from err
-
-
-def _print_header(
-    time_classes: list[TimeClass], username: str, months: int, today: date
-) -> None:
-    start_sync_year, start_sync_month = get_first_month_in_window(today, months)
-    start_sync_format = "%b" if start_sync_year == today.year else "%b %Y"
-
-    end_of_range = today.strftime("%b %Y")
-    start_of_range = date(start_sync_year, start_sync_month, 1).strftime(
-        start_sync_format
-    )
-    sync_range = (start_of_range + "–" if months > 1 else "") + end_of_range  # ruff: ignore[ambiguous-unicode-character-string]
-    filtered_time_classes = (
-        ", ".join(time_classes)
-        if len(time_classes) < len(list(TimeClass))
-        else "all time classes"
-    )
-    username_display = f"Synced [bold]{username}[/bold]"
-    header_parts = [username_display, sync_range, filtered_time_classes]
-
-    console.print(f"{' · '.join(header_parts)}")
-
-
-def _print_games_grid(summary: SyncSummary, time_classes: list[TimeClass]) -> None:
-    games_grid = Table.grid(padding=(0, 2))
-    games_grid.add_column()
-    games_grid.add_column(justify="right", style="green")
-
-    filtered_new_games = {
-        time_class: summary.new_games[time_class]
-        for time_class in list(TimeClass)
-        if time_class in time_classes
-    }
-
-    total_new_games = sum(filtered_new_games.values())
-    if total_new_games == 0:
-        games_grid.add_row("No new games.")
-    else:
-        console.print("New games")
-        for time_class, amount in filtered_new_games.items():
-            if amount != 0:
-                games_grid.add_row(f"  [dim]{time_class}[/dim]", f"{amount}")
-        games_grid.add_row("  [dim]total[/dim]", f"{total_new_games}")
-
-    console.print(games_grid)
-
-
-def _print_details_grid(summary: SyncSummary) -> None:
-    details_grid = Table.grid(padding=(0, 2))
-    details_grid.add_column()
-    details_grid.add_column()
-
-    months_info = []
-    if summary.months_unchanged != 0:
-        months_info.append(f"{summary.months_unchanged} unchanged")
-    if summary.months_completed != 0:
-        months_info.append(f"{summary.months_completed} already complete")
-    if len(months_info) != 0:
-        details_grid.add_row(
-            "Months",
-            f"{' · '.join(months_info)}",
-        )
-
-    skipped_info = []
-    if summary.game_variants != 0:
-        skipped_info.append(f"[yellow]{summary.game_variants}[/yellow] variants")
-    if summary.unreadable_games != 0:
-        skipped_info.append(f"[yellow]{summary.unreadable_games}[/yellow] unreadable")
-    if summary.username_mismatches != 0:
-        skipped_info.append(
-            f"[yellow]{summary.username_mismatches}[/yellow] username mismatches"
-        )
-    if summary.other != 0:
-        skipped_info.append(f"[yellow]{summary.other}[/yellow] other")
-    if len(skipped_info) != 0:
-        skipped_info.append("[dim]all time classes[/dim]")
-        details_grid.add_row(
-            "Skipped",
-            f"{' · '.join(skipped_info)}",
-        )
-
-    unknown_codes = []
-    for code, count in summary.unknown_result_codes.items():
-        unknown_codes.append(f"[yellow]{code} ({count})[/yellow]")
-    if len(unknown_codes) != 0:
-        details_grid.add_row(
-            "", f"[dim]unknown result codes[/dim]: {', '.join(unknown_codes)}"
-        )
-
-    console.print(details_grid)
-
-
-def _print_summary(
-    summary: SyncSummary,
-    time_classes: list[TimeClass],
-    username: str,
-    months: int,
-    today: date,
-) -> None:
-    _print_header(time_classes, username, months, today)
-    console.print()
-    _print_games_grid(summary, time_classes)
-    console.print()
-    _print_details_grid(summary)
 
 
 @app.callback()
@@ -182,7 +80,7 @@ def main(
             envvar="APP_DB_PATH",
             help="Path to the SQLite database file. Put it before the command.",
         ),
-    ] = DATABASE_PATH,
+    ] = DEFAULT_DB_PATH,
 ) -> None:
     """Fetch your chess.com games into a local SQLite database.
 
@@ -195,7 +93,7 @@ def main(
         ctx: The Typer context. Commands read the settings from `ctx.obj`.
         db_path: Path to the SQLite database file. Set it with `--db` or
             the `APP_DB_PATH` environment variable. Defaults to
-            `DATABASE_PATH`.
+            `DEFAULT_DB_PATH`.
     """  # ruff: ignore[escape-sequence-in-docstring]
     try:
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -213,7 +111,7 @@ def main(
     ctx.obj = CliConfig(db_path)
 
     try:
-        db.init_db(db_path)
+        init_db(db_path)
     except sqlite3.DatabaseError as err:
         _handle_error(
             err,
@@ -226,9 +124,7 @@ def fetch(
     ctx: typer.Context,
     username: Annotated[
         str,
-        typer.Argument(
-            callback=_non_empty_lowercase_username, help="Chess.com username."
-        ),
+        typer.Argument(callback=_parse_username, help="Chess.com username."),
     ],
     months: Annotated[
         int,
@@ -260,21 +156,21 @@ def fetch(
     if time_classes is None:
         time_classes = list(TimeClass)
 
-    today = _get_today()
+    today = _today_utc()
 
     with Client() as http_client:
         try:
             summary = sync(
-                chess_client=_get_chess_client(http_client, username),
+                chess_client=_make_chess_client(http_client, username),
                 db_path=config.db_path,
                 username=username,
                 months=months,
                 today=today,
             )
-        except (ChessFetcherError, sqlite3.Error) as err:
+        except (ChessClientError, sqlite3.Error) as err:
             _handle_error(err, str(err))
 
-    _print_summary(summary, time_classes, username, months, today)
+    print_sync_summary(summary, time_classes, username, months, today)
 
 
 @app.command()
@@ -282,12 +178,12 @@ def score(
     ctx: typer.Context,
     username: Annotated[
         str,
-        typer.Argument(
-            callback=_non_empty_lowercase_username, help="Chess.com username."
-        ),
+        typer.Argument(callback=_parse_username, help="Chess.com username."),
     ],
 ) -> None:
     """Show a player's wins, draws, losses and score from saved games.
+
+    Score counts a win as 1 point and a draw as ½, as a percentage of games played.
 
     Run `fetch` first; this command reads only the local database.
 
@@ -297,38 +193,4 @@ def score(
         username: Chess.com username, stripped and lowercased.
     """  # ruff: ignore[escape-sequence-in-docstring]
     config = _as_cli_config(ctx.obj)
-    record = db.get_record(config.db_path, username)
-
-    total_games = sum(asdict(record).values())
-    if total_games == 0:
-        console.print(
-            f"[dim]No games saved for {username}. Run `chesscom-fetch fetch {username}` to download them.[/dim]"
-        )
-        return
-
-    console.print(f"Record for [bold]{username}[/bold] · {total_games} games")
-    console.print()
-
-    score_grid = Table.grid(padding=(0, 2))
-    score_grid.add_column(style="dim")
-    score_grid.add_column(justify="right")
-    score_grid.add_column(justify="right")
-
-    score_grid.add_row(
-        "wins", str(record.wins), f"{record.wins / total_games:.1%}", style="green"
-    )
-    score_grid.add_row("draws", str(record.draws), f"{record.draws / total_games:.1%}")
-    score_grid.add_row(
-        "losses",
-        str(record.losses),
-        f"{record.losses / total_games:.1%}",
-        style="red",
-    )
-    score_grid.add_row()
-
-    score = record.wins + 0.5 * record.draws
-    score_grid.add_row(
-        "score", f"{score:g} / {total_games}", f"{score / total_games:.1%}"
-    )
-
-    console.print(score_grid)
+    print_record(username, get_record(config.db_path, username))

@@ -6,25 +6,26 @@ import pytest
 from httpx2 import Request, Response, codes
 from pydantic import HttpUrl
 
-from chesscom_fetch.db import (
-    ArchiveStateRow,
-    add_archive_state,
-    get_archive_state,
-    get_connection,
-)
-from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Archive, Game, TimeClass
+from chesscom_fetch.api_models import Archive, Game
+from chesscom_fetch.client import ChessClient
+from chesscom_fetch.database import get_connection
+from chesscom_fetch.domain import TimeClass
 from chesscom_fetch.sync import (
     SyncSummary,
     _is_archive_in_window,
     _is_month_complete,
     sync,
 )
+from chesscom_fetch.sync_store import (
+    ArchiveStateRow,
+    get_archive_state,
+    upsert_archive_state,
+)
 from tests.helpers import (
     ARCHIVE_LIST_URL,
-    TEST_ETAG,
-    TEST_USERNAME_WHITE,
+    ETAG,
     UNKNOWN_API_RESULT_CODE,
+    USERNAME_WHITE,
     MakeChessClient,
     ResponseByUrl,
     build_archive_list_response,
@@ -90,7 +91,7 @@ class TestIsMonthComplete:
             ),
         ],
     )
-    def test_returns_correct_value(
+    def test_is_complete_only_after_month_ends(
         self, year: int, month: int, today: date, expected: bool
     ) -> None:
         assert (
@@ -145,7 +146,7 @@ class TestIsArchiveInWindow:
             ),
         ],
     )
-    def test_returns_correct_value(
+    def test_includes_only_months_in_window(
         self, months: int, year: int, month: int, expected: bool
     ) -> None:
         assert (
@@ -181,7 +182,7 @@ class TestSync:
         return sync(
             chess_client=chess_client,
             db_path=db_path,
-            username=TEST_USERNAME_WHITE,
+            username=USERNAME_WHITE,
             months=months,
             today=self.TODAY,
         )
@@ -206,9 +207,9 @@ class TestSync:
         self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
     ) -> None:
         with get_connection(temp_db) as conn:
-            add_archive_state(
+            upsert_archive_state(
                 conn,
-                ArchiveStateRow(url=self.NOVEMBER_URL, etag=TEST_ETAG, complete=True),
+                ArchiveStateRow(url=self.NOVEMBER_URL, etag=ETAG, complete=True),
             )
 
         response_by_url = {
@@ -227,9 +228,9 @@ class TestSync:
         self, temp_db: Path, make_chess_client: MakeChessClient
     ) -> None:
         with get_connection(temp_db) as conn:
-            add_archive_state(
+            upsert_archive_state(
                 conn,
-                ArchiveStateRow(url=self.OCTOBER_URL, etag=TEST_ETAG, complete=False),
+                ArchiveStateRow(url=self.OCTOBER_URL, etag=ETAG, complete=False),
             )
 
         def handler(request: Request) -> Response:
@@ -237,7 +238,7 @@ class TestSync:
                 return build_archive_list_response([self.OCTOBER_URL])
 
             etag = request.headers.get("if-none-match")
-            if etag == TEST_ETAG:
+            if etag == ETAG:
                 return Response(codes.NOT_MODIFIED)
 
             return build_archive_month_response([])
@@ -250,7 +251,7 @@ class TestSync:
             october_state = get_archive_state(conn, self.OCTOBER_URL)
 
         assert october_state is not None
-        assert october_state.etag == TEST_ETAG
+        assert october_state.etag == ETAG
         assert october_state.complete
 
     def test_second_run_wider_window_stores_older_month(
@@ -292,9 +293,9 @@ class TestSync:
         self, fake_game: Game, make_chess_client: MakeChessClient, temp_db: Path
     ) -> None:
         with get_connection(temp_db) as conn:
-            add_archive_state(
+            upsert_archive_state(
                 conn,
-                ArchiveStateRow(url=self.NOVEMBER_URL, etag=TEST_ETAG, complete=False),
+                ArchiveStateRow(url=self.NOVEMBER_URL, etag=ETAG, complete=False),
             )
 
         def handler(request: Request) -> Response:
@@ -302,7 +303,7 @@ class TestSync:
                 return build_archive_list_response([self.NOVEMBER_URL])
 
             etag = request.headers.get("if-none-match")
-            if etag == TEST_ETAG:
+            if etag == ETAG:
                 return Response(codes.NOT_MODIFIED)
 
             return build_archive_month_response([fake_game])
@@ -356,7 +357,7 @@ class TestSync:
             ARCHIVE_LIST_URL: build_archive_list_response(
                 [self.SEPTEMBER_URL, self.OCTOBER_URL, self.NOVEMBER_URL]
             ),
-            self.OCTOBER_URL: build_archive_month_response([fake_game], TEST_ETAG),
+            self.OCTOBER_URL: build_archive_month_response([fake_game], ETAG),
             self.NOVEMBER_URL: build_archive_month_response([]),
         }
 
@@ -369,7 +370,7 @@ class TestSync:
             november_state = get_archive_state(conn, self.NOVEMBER_URL)
 
         assert october_state is not None
-        assert october_state.etag == TEST_ETAG
+        assert october_state.etag == ETAG
         assert october_state.complete
 
         assert november_state is not None

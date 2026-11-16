@@ -7,27 +7,41 @@ from unittest.mock import MagicMock
 from httpx2 import Request, Response, codes
 from typer.testing import Result as RunnerResult
 
-from chesscom_fetch.db import get_connection
-from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Colour, Game, GameRow, Result
+from chesscom_fetch.api_models import Game
+from chesscom_fetch.client import ChessClient
+from chesscom_fetch.database import GameRow, get_connection
+from chesscom_fetch.domain import Colour, Result
 
-TEST_USERNAME_WHITE = "testplayerwhite"
-TEST_USERNAME_BLACK = "testplayerblack"
-TEST_FETCH_DATE = date(2026, 11, 9)
-TEST_ETAG = '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
-TEST_ARCHIVE_MONTH_URLS = [
-    f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/2026/01",
-    f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/2026/02",
-    f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/2026/03",
+# Players & Dates
+
+USERNAME_WHITE = "testplayerwhite"  # white player from fake_game.json
+USERNAME_BLACK = "testplayerblack"  # black player from fake_game.json
+FETCH_DATE = date(2026, 11, 9)
+
+# Chess.com API
+
+PLAYER_GAMES_URL = f"https://api.chess.com/pub/player/{USERNAME_WHITE}/games"
+ARCHIVE_MONTH_URLS = [
+    f"{PLAYER_GAMES_URL}/2026/01",
+    f"{PLAYER_GAMES_URL}/2026/02",
+    f"{PLAYER_GAMES_URL}/2026/03",
 ]
-ARCHIVE_LIST_URL = (
-    f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/archives"
-)
+ARCHIVE_LIST_URL = f"{PLAYER_GAMES_URL}/archives"
+ETAG = '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
 UNKNOWN_API_RESULT_CODE = "unknown"
 
+# Opening Families
+
+FRENCH_DEFENSE = "French Defense"
+CARO_KANN_DEFENSE = "Caro Kann Defense"
+SCANDINAVIAN_DEFENSE = "Scandinavian Defense"
+SICILIAN_DEFENSE = "Sicilian Defense"
+VIENNA_GAMBIT = "Vienna Gambit"
+LONDON_SYSTEM = "London System"
+
 type Handler = Callable[[Request], Response]
-type PatchGetChessClient = Callable[[ResponseByUrl], list[str]]
 type ResponseByUrl = Mapping[str, Response | Exception]
+type PatchMakeChessClient = Callable[[ResponseByUrl], list[str]]
 
 
 class MakeChessClient(Protocol):
@@ -36,7 +50,7 @@ class MakeChessClient(Protocol):
     ) -> ChessClient: ...
 
 
-class GetFetchResult(Protocol):
+class RunFetch(Protocol):
     def __call__(
         self,
         response_by_url: ResponseByUrl,
@@ -52,6 +66,11 @@ class BuildFakeGameRow(Protocol):
         opening_family: str = ...,
         colour: Colour = ...,
     ) -> GameRow: ...
+
+
+def count_games_table_rows(db_path: Path) -> int:
+    with get_connection(db_path) as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM games").fetchone()[0])
 
 
 def build_archive_month_response(
@@ -70,16 +89,9 @@ def build_archive_list_response(urls: list[str]) -> Response:
     return Response(codes.OK, json={"archives": urls})
 
 
-def count_games_table_rows(db_path: Path) -> int:
-    with get_connection(db_path) as conn:
-        return int(conn.execute("SELECT COUNT(*) FROM games").fetchone()[0])
-
-
-def build_handler(
-    response_by_url: ResponseByUrl, requests_record: list[str]
-) -> Handler:
+def build_handler(response_by_url: ResponseByUrl, requested_urls: list[str]) -> Handler:
     def _handler(request: Request) -> Response:
-        requests_record.append(str(request.url))
+        requested_urls.append(str(request.url))
         result = response_by_url.get(str(request.url), Response(codes.NOT_FOUND))
         if isinstance(result, Exception):
             raise result
@@ -89,4 +101,4 @@ def build_handler(
 
 
 def build_archive_url(year: int, month: int) -> str:
-    return f"https://api.chess.com/pub/player/{TEST_USERNAME_WHITE}/games/{year}/{month:02d}"
+    return f"{PLAYER_GAMES_URL}/{year}/{month:02d}"

@@ -1,0 +1,189 @@
+from pathlib import Path
+
+import pytest
+
+from chesscom_fetch.database import get_connection
+from chesscom_fetch.domain import Colour, Result
+from chesscom_fetch.reports import Record, get_record, get_top_openings
+from chesscom_fetch.sync_store import add_games
+from tests.helpers import (
+    CARO_KANN_DEFENSE,
+    FRENCH_DEFENSE,
+    LONDON_SYSTEM,
+    SCANDINAVIAN_DEFENSE,
+    SICILIAN_DEFENSE,
+    USERNAME_BLACK,
+    USERNAME_WHITE,
+    VIENNA_GAMBIT,
+    BuildFakeGameRow,
+)
+
+
+class TestGetRecord:
+    def test_counts_each_result(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.WIN),
+                    build_fake_game_row(Result.DRAW),
+                    build_fake_game_row(Result.LOSS),
+                    build_fake_game_row(Result.LOSS),
+                ],
+            )
+
+        record = get_record(temp_db, USERNAME_WHITE)
+
+        assert record == Record(wins=3, draws=1, losses=2)
+
+    def test_returns_zeros_when_no_games(self, temp_db: Path) -> None:
+        record = get_record(temp_db, USERNAME_WHITE)
+
+        assert record == Record()
+
+    def test_counts_only_requested_player(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(username=USERNAME_WHITE),
+                    build_fake_game_row(username=USERNAME_WHITE),
+                    build_fake_game_row(username=USERNAME_BLACK),
+                ],
+            )
+
+        white_record = get_record(temp_db, USERNAME_WHITE)
+
+        assert white_record.total_games == 2
+
+
+class TestRecord:
+    def test_points_count_draws_as_half(self) -> None:
+        record = Record(wins=1, draws=1, losses=0)
+        assert record.points == pytest.approx(1.5)
+
+    def test_total_games_adds_all_results(self) -> None:
+        record = Record(wins=1, draws=3, losses=2)
+        assert record.total_games == 6
+
+    def test_score_is_points_over_games(self) -> None:
+        record = Record(wins=1, draws=2, losses=1)
+        assert record.score == pytest.approx(0.5)
+
+    def test_score_is_none_without_games(self) -> None:
+        record = Record(wins=0, draws=0, losses=0)
+        assert record.score is None
+
+
+class TestGetTopOpenings:
+    def test_orders_by_games_played(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=CARO_KANN_DEFENSE),
+                ],
+            )
+
+        openings = get_top_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        assert openings[0][0] == FRENCH_DEFENSE
+        assert openings[1][0] == CARO_KANN_DEFENSE
+
+    def test_breaks_ties_alphabetically(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=CARO_KANN_DEFENSE),
+                ],
+            )
+
+        openings = get_top_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        assert openings[0][0] == CARO_KANN_DEFENSE
+        assert openings[1][0] == FRENCH_DEFENSE
+
+    def test_returns_at_most_five_openings(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=CARO_KANN_DEFENSE),
+                    build_fake_game_row(opening_family=SCANDINAVIAN_DEFENSE),
+                    build_fake_game_row(opening_family=LONDON_SYSTEM),
+                    build_fake_game_row(opening_family=VIENNA_GAMBIT),
+                    build_fake_game_row(opening_family=SICILIAN_DEFENSE),
+                ],
+            )
+
+        openings = get_top_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        assert len(openings) == 5
+
+    def test_returns_empty_when_no_games_as_colour(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                ],
+            )
+
+        openings = get_top_openings(temp_db, USERNAME_WHITE, Colour.BLACK)
+        assert len(openings) == 0
+
+    def test_counts_only_requested_colour(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        opening_family=FRENCH_DEFENSE, colour=Colour.WHITE
+                    ),
+                    build_fake_game_row(
+                        opening_family=CARO_KANN_DEFENSE, colour=Colour.BLACK
+                    ),
+                ],
+            )
+
+        openings = get_top_openings(temp_db, USERNAME_WHITE, Colour.BLACK)
+        assert len(openings) == 1
+        assert openings[0][0] == CARO_KANN_DEFENSE
+
+    def test_counts_only_requested_player(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        username=USERNAME_WHITE, opening_family=FRENCH_DEFENSE
+                    ),
+                    build_fake_game_row(
+                        username=USERNAME_BLACK, opening_family=CARO_KANN_DEFENSE
+                    ),
+                ],
+            )
+
+        openings = get_top_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        assert len(openings) == 1

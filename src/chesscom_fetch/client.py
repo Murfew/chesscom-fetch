@@ -1,3 +1,5 @@
+"""HTTP client for Chess.com's archive endpoints, and the errors it raises."""
+
 import math
 import time
 from collections.abc import Callable, Mapping
@@ -15,15 +17,15 @@ from httpx2 import (
 )
 from pydantic import BaseModel, ValidationError
 
-from chesscom_fetch.models import ArchiveList, ArchiveMonth
+from chesscom_fetch.api_models import ArchiveList, ArchiveMonth
 
 DEFAULT_RETRY_WAIT_TIME_SECONDS = 5
 MAX_RETRY_WAIT_TIME_SECONDS = 30
 USER_AGENT = "chesscom-fetch (matthew.hurley953@gmail.com)"
 
 
-class ChessFetcherError(Exception):
-    """Base for all fetcher errors."""
+class ChessClientError(Exception):
+    """Base for every error ChessClient raises."""
 
     def __init__(
         self,
@@ -46,7 +48,7 @@ class ChessFetcherError(Exception):
         return f"[{self.error_code}] {super().__str__()}"
 
 
-class InvalidResponseError(ChessFetcherError):
+class InvalidResponseError(ChessClientError):
     """Raised when Chess.com's response isn't the JSON shape the models expect."""
 
     def __init__(self, url: URL, detail: str) -> None:
@@ -58,7 +60,7 @@ class InvalidResponseError(ChessFetcherError):
         )
 
 
-class FetchTimeoutError(ChessFetcherError):
+class FetchTimeoutError(ChessClientError):
     """Raised when Chess.com doesn't respond in time."""
 
     def __init__(self, url: URL) -> None:
@@ -69,7 +71,7 @@ class FetchTimeoutError(ChessFetcherError):
         )
 
 
-class PlayerNotFoundError(ChessFetcherError):
+class PlayerNotFoundError(ChessClientError):
     """Raised when Chess.com has no data for the player or archive."""
 
     def __init__(self, username: str) -> None:
@@ -80,7 +82,7 @@ class PlayerNotFoundError(ChessFetcherError):
         )
 
 
-class RateLimitExhaustedError(ChessFetcherError):
+class RateLimitExhaustedError(ChessClientError):
     """Raised when Chess.com still answers 429 after retrying."""
 
     def __init__(self, host: str) -> None:
@@ -91,7 +93,7 @@ class RateLimitExhaustedError(ChessFetcherError):
         )
 
 
-class ChessNetworkError(ChessFetcherError):
+class ChessNetworkError(ChessClientError):
     """Raised when Chess.com can't be reached at all."""
 
     def __init__(self, host: str) -> None:
@@ -132,6 +134,19 @@ def _retry_after_seconds(headers: Headers) -> float:
 
 
 def _validate_response_format[T: BaseModel](response: Response, model: type[T]) -> T:
+    """Parse a response body into `model`, or fail with a readable error.
+
+    Args:
+        response: The HTTP response whose body should be JSON.
+        model: The Pydantic model the JSON should match.
+
+    Returns:
+        The parsed model.
+
+    Raises:
+        InvalidResponseError: The body isn't JSON or doesn't match `model`. The
+            message is the first validation error, not the whole list.
+    """
     try:
         return model.model_validate_json(response.text)
     except ValidationError as err:
@@ -164,7 +179,7 @@ class ChessClient:
         self.client.base_url = f"https://api.chess.com/pub/player/{self.username}/games"
 
     def _get_once(self, url: str, headers: Mapping[str, str] | None = None) -> Response:
-        """Send one GET request, turning network failures into fetcher errors.
+        """Send one GET request, turning network failures into ChessClientErrors.
 
         Args:
             url: The URL to fetch, absolute or relative to the player's base URL.
@@ -220,7 +235,7 @@ class ChessClient:
         else:
             return response
 
-    def get_archive_list(self) -> ArchiveList:
+    def fetch_archive_list(self) -> ArchiveList:
         """Return the list of monthly archive URLs for the player.
 
         Returns:
@@ -228,7 +243,7 @@ class ChessClient:
 
         Raises:
             PlayerNotFoundError: Chess.com has no player with this username.
-            ChessFetcherError: Chess.com answered with any other error status.
+            ChessClientError: Chess.com answered with any other error status.
         """
         try:
             response = self._get_with_retry("/archives")
@@ -237,13 +252,13 @@ class ChessClient:
             if err.response.status_code == codes.NOT_FOUND:
                 raise PlayerNotFoundError(self.username) from err
 
-            raise ChessFetcherError(
+            raise ChessClientError(
                 url=err.request.url, error_code=err.response.status_code
             ) from err
 
         return _validate_response_format(response, ArchiveList)
 
-    def get_archive_month(
+    def fetch_archive_month(
         self, url: str, etag: str | None = None
     ) -> tuple[ArchiveMonth, str | None] | None:
         """Fetch one month's games, sending the stored ETag.
@@ -257,7 +272,7 @@ class ChessClient:
             304 Not Modified.
 
         Raises:
-            ChessFetcherError: Chess.com answered with any other error status.
+            ChessClientError: Chess.com answered with any other error status.
         """
         try:
             response = self._get_with_retry(
@@ -267,7 +282,7 @@ class ChessClient:
             if err.response.status_code == codes.NOT_MODIFIED:
                 return None
 
-            raise ChessFetcherError(
+            raise ChessClientError(
                 url=err.request.url, error_code=err.response.status_code
             ) from err
 

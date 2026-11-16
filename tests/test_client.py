@@ -4,21 +4,21 @@ import pytest
 from httpx2 import Headers, Request, Response, codes
 from pytest_mock import MockerFixture
 
-from chesscom_fetch.http import (
+from chesscom_fetch.api_models import Archive, Game
+from chesscom_fetch.client import (
     DEFAULT_RETRY_WAIT_TIME_SECONDS,
     MAX_RETRY_WAIT_TIME_SECONDS,
     USER_AGENT,
-    ChessFetcherError,
+    ChessClientError,
     PlayerNotFoundError,
     RateLimitExhaustedError,
     _retry_after_seconds,
 )
-from chesscom_fetch.models import Archive, Game
 from tests.helpers import (
     ARCHIVE_LIST_URL,
-    TEST_ARCHIVE_MONTH_URLS,
-    TEST_ETAG,
-    TEST_USERNAME_WHITE,
+    ARCHIVE_MONTH_URLS,
+    ETAG,
+    USERNAME_WHITE,
     MakeChessClient,
     build_archive_list_response,
     build_archive_month_response,
@@ -32,7 +32,7 @@ def build_429_response(retry_after: float) -> Response:
     )
 
 
-class TestGetArchiveList:
+class TestFetchArchiveList:
     def test_returns_archives(
         self,
         make_chess_client: MakeChessClient,
@@ -40,13 +40,13 @@ class TestGetArchiveList:
         def handler(request: Request) -> Response:
             assert request.url == ARCHIVE_LIST_URL
 
-            return build_archive_list_response(TEST_ARCHIVE_MONTH_URLS)
+            return build_archive_list_response(ARCHIVE_MONTH_URLS)
 
         client = make_chess_client(handler)
-        archive_list = client.get_archive_list()
+        archive_list = client.fetch_archive_list()
 
         assert archive_list.archives == [
-            Archive.model_validate(url) for url in TEST_ARCHIVE_MONTH_URLS
+            Archive.model_validate(url) for url in ARCHIVE_MONTH_URLS
         ]
 
     def test_sends_user_agent(
@@ -57,10 +57,10 @@ class TestGetArchiveList:
 
             assert request.headers.get("user-agent") == USER_AGENT
 
-            return build_archive_list_response(TEST_ARCHIVE_MONTH_URLS)
+            return build_archive_list_response(ARCHIVE_MONTH_URLS)
 
         client = make_chess_client(handler)
-        client.get_archive_list()
+        client.fetch_archive_list()
 
     def test_raises_player_not_found_on_404(
         self,
@@ -72,9 +72,9 @@ class TestGetArchiveList:
         client = make_chess_client(handler)
         with pytest.raises(
             PlayerNotFoundError,
-            match=f"404.*{TEST_USERNAME_WHITE}",
+            match=f"404.*{USERNAME_WHITE}",
         ):
-            client.get_archive_list()
+            client.fetch_archive_list()
 
     def test_includes_url_and_status_on_unexpected_error(
         self,
@@ -84,8 +84,8 @@ class TestGetArchiveList:
             return Response(status_code=codes.INTERNAL_SERVER_ERROR)
 
         client = make_chess_client(handler)
-        with pytest.raises(ChessFetcherError, match=f"500.*{ARCHIVE_LIST_URL}"):
-            client.get_archive_list()
+        with pytest.raises(ChessClientError, match=f"500.*{ARCHIVE_LIST_URL}"):
+            client.fetch_archive_list()
 
 
 class TestGetWithRetry:
@@ -98,7 +98,7 @@ class TestGetWithRetry:
         responses = iter(
             [
                 build_429_response(self.RETRY_AFTER),
-                build_archive_list_response(TEST_ARCHIVE_MONTH_URLS),
+                build_archive_list_response(ARCHIVE_MONTH_URLS),
             ]
         )
 
@@ -108,7 +108,7 @@ class TestGetWithRetry:
 
         wait_mock = mocker.MagicMock()
         client = make_chess_client(handler, wait_mock)
-        client.get_archive_list()
+        client.fetch_archive_list()
 
         wait_mock.assert_called_once_with(self.RETRY_AFTER)
         assert len(requests) == 2
@@ -121,7 +121,7 @@ class TestGetWithRetry:
             [
                 build_429_response(self.RETRY_AFTER),
                 build_429_response(self.RETRY_AFTER),
-                build_archive_list_response(TEST_ARCHIVE_MONTH_URLS),
+                build_archive_list_response(ARCHIVE_MONTH_URLS),
             ]
         )
 
@@ -133,24 +133,24 @@ class TestGetWithRetry:
         client = make_chess_client(handler, wait_mock)
 
         with pytest.raises(RateLimitExhaustedError):
-            client.get_archive_list()
+            client.fetch_archive_list()
 
         wait_mock.assert_called_once_with(self.RETRY_AFTER)
         assert len(requests) == 2
 
 
-class TestGetArchiveMonth:
+class TestFetchArchiveMonth:
     def test_sends_if_none_match(
         self, make_chess_client: MakeChessClient, fake_game: Game
     ) -> None:
 
         def handler(request: Request) -> Response:
-            assert request.headers.get("if-none-match") == TEST_ETAG
+            assert request.headers.get("if-none-match") == ETAG
 
             return build_archive_month_response([fake_game])
 
         client = make_chess_client(handler)
-        client.get_archive_month(TEST_ARCHIVE_MONTH_URLS[0], TEST_ETAG)
+        client.fetch_archive_month(ARCHIVE_MONTH_URLS[0], ETAG)
 
     def test_returns_none_on_304(self, make_chess_client: MakeChessClient) -> None:
         def handler(request: Request) -> Response:
@@ -159,7 +159,7 @@ class TestGetArchiveMonth:
             )
 
         client = make_chess_client(handler)
-        assert client.get_archive_month(TEST_ARCHIVE_MONTH_URLS[0]) is None
+        assert client.fetch_archive_month(ARCHIVE_MONTH_URLS[0]) is None
 
 
 class TestRetryAfterSeconds:
