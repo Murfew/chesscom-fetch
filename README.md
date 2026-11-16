@@ -176,9 +176,9 @@ uv run ruff format .   # format
 uv run mypy .          # type check (strict)
 ```
 
-The tests swap in a fake HTTP transport, so they run offline. Saved API data lives
-in `tests/`: `archive_month.json` is a saved monthly archive response, including a
-Chess960 game, and `fake_game.json` is a single game.
+The tests swap in a fake HTTP transport, so they run offline. Saved API data lives in `tests/`: `archive_month.json` is a saved monthly archive response, including a Chess960 game, and `fake_game.json` is a single game.
+
+Docstrings use Google style: full `Args`/`Returns`/`Raises` sections for public functions, one line for private helpers. The full rule is in `pyproject.toml` next to the pydoclint settings.
 
 ## Design decisions
 

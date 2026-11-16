@@ -104,7 +104,15 @@ preview = true
 convention = "google"
 
 [tool.ruff.lint.pydoclint]
-ignore-one-line-docstrings = true # private helpers get one line; full Google-style sections are for the public API
+# Docstring convention (Google style):
+#   public functions: summary + Args/Returns/Raises/Yields as they apply
+#   private helpers: one line, unless they raise or their args aren't obvious
+#   properties: one line, like an attribute
+#   own dataclasses: summary + Attributes; models of outside schemas: one line
+#   exceptions, enums: one line on the class, nothing on __init__
+# This setting lets one-liners skip section checks, so ruff can't catch a public
+# function that should have sections; that part is on review.
+ignore-one-line-docstrings = true
 
 [tool.ruff.lint.pycodestyle]
 max-doc-length = 88 # W505: flag docstring and comment lines the formatter won't wrap
