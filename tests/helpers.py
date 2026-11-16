@@ -9,7 +9,7 @@ from typer.testing import Result as RunnerResult
 
 from chesscom_fetch.db import get_connection
 from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Game, GameRow, Result
+from chesscom_fetch.models import Colour, Game, GameRow, Result
 
 TEST_USERNAME_WHITE = "testplayerwhite"
 TEST_USERNAME_BLACK = "testplayerblack"
@@ -45,7 +45,13 @@ class GetFetchResult(Protocol):
 
 
 class BuildFakeGameRow(Protocol):
-    def __call__(self, result: Result, username: str = ...) -> GameRow: ...
+    def __call__(
+        self,
+        result: Result = ...,
+        username: str = ...,
+        opening_family: str = ...,
+        colour: Colour = ...,
+    ) -> GameRow: ...
 
 
 def build_archive_month_response(

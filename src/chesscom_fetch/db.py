@@ -174,7 +174,9 @@ class Record:
     losses: int = 0
 
 
-def get_record(db_path: Path, username: str) -> Record:
+def get_record(
+    db_path: Path, username: str, opening_family: str | None = None
+) -> Record:
     """Count a player's wins, draws and losses in the database.
 
     Only games already saved by `fetch` are counted; nothing is downloaded.
@@ -182,6 +184,8 @@ def get_record(db_path: Path, username: str) -> Record:
     Args:
         db_path: Path to the SQLite database file.
         username: Chess.com username, lowercased to match stored rows.
+        opening_family: Only count games in this opening family.
+            If None, games in every opening family are counted.
 
     Returns:
         The player's record. Every count is 0 if no games are stored.
@@ -190,9 +194,11 @@ def get_record(db_path: Path, username: str) -> Record:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT result, COUNT(*) AS count FROM games WHERE username = ? GROUP BY result
+            SELECT result, COUNT(*) AS count FROM games
+            WHERE username = ? AND (? IS NULL OR opening_family = ?)
+            GROUP BY result
             """,
-            (username,),
+            (username, opening_family, opening_family),
         )
         raw_counts = dict(cur.fetchall())
         return Record(

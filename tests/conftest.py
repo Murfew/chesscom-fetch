@@ -15,7 +15,7 @@ from chesscom_fetch import db
 from chesscom_fetch.cli import app
 from chesscom_fetch.converter import game_to_game_row
 from chesscom_fetch.http import ChessClient
-from chesscom_fetch.models import Game, GameRow, Result
+from chesscom_fetch.models import Colour, Game, GameRow, Result
 from tests.helpers import (
     TEST_FETCH_DATE,
     TEST_USERNAME_WHITE,
@@ -134,13 +134,18 @@ def build_fake_game_row(fake_game_row: GameRow) -> BuildFakeGameRow:
     counter = count(1)
 
     def _build_fake_game_row(
-        result: Result, username: str = TEST_USERNAME_WHITE
+        result: Result = Result.WIN,
+        username: str = TEST_USERNAME_WHITE,
+        opening_family: str = "Unknown",
+        colour: Colour = Colour.WHITE,
     ) -> GameRow:
         return fake_game_row.model_copy(
             update={
                 "url": f"https://www.chess.com/game/live/{next(counter)}",
                 "result": result,
                 "username": username,
+                "opening_family": opening_family,
+                "colour": colour,
             }
         )
 

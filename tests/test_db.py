@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from pathlib import Path
 from sqlite3 import IntegrityError
 from typing import ClassVar, NoReturn
@@ -32,6 +33,10 @@ VALID_ENUM_FIELD_VALUES = (
     ]
     + [pytest.param("colour", colour, id=f"colour-{colour}") for colour in list(Colour)]
 )
+
+FRENCH_DEFENSE = "French Defense"
+CARO_KANN = "Caro Kann"
+SCANDINAVIAN_DEFENSE = "Scandinavian Defense"
 
 
 class DummyError(Exception):
@@ -187,13 +192,82 @@ class TestGetRecord:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(Result.LOSS, TEST_USERNAME_WHITE),
-                    build_fake_game_row(Result.WIN, TEST_USERNAME_BLACK),
+                    build_fake_game_row(username=TEST_USERNAME_WHITE),
+                    build_fake_game_row(username=TEST_USERNAME_WHITE),
+                    build_fake_game_row(username=TEST_USERNAME_BLACK),
                 ],
             )
 
         white_record = get_record(temp_db, TEST_USERNAME_WHITE)
-        black_record = get_record(temp_db, TEST_USERNAME_BLACK)
 
-        assert white_record == Record(losses=1)
-        assert black_record == Record(wins=1)
+        assert sum(asdict(white_record).values()) == 2
+
+    def test_counts_only_requested_opening_family(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=CARO_KANN),
+                ],
+            )
+
+        record = get_record(temp_db, TEST_USERNAME_WHITE, FRENCH_DEFENSE)
+        assert sum(asdict(record).values()) == 2
+
+    def test_counts_every_opening_family_when_none_given(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=CARO_KANN),
+                ],
+            )
+
+        record = get_record(temp_db, TEST_USERNAME_WHITE)
+        assert sum(asdict(record).values()) == 3
+
+    def test_returns_zeros_for_unplayed_opening_family(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(opening_family=CARO_KANN),
+                ],
+            )
+
+        record = get_record(temp_db, TEST_USERNAME_WHITE, SCANDINAVIAN_DEFENSE)
+        assert sum(asdict(record).values()) == 0
+
+    def test_counts_only_requested_player_within_opening_family(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        username=TEST_USERNAME_WHITE, opening_family=FRENCH_DEFENSE
+                    ),
+                    build_fake_game_row(
+                        username=TEST_USERNAME_BLACK, opening_family=FRENCH_DEFENSE
+                    ),
+                    build_fake_game_row(
+                        username=TEST_USERNAME_WHITE, opening_family=CARO_KANN
+                    ),
+                ],
+            )
+
+        record = get_record(temp_db, TEST_USERNAME_WHITE, FRENCH_DEFENSE)
+        assert sum(asdict(record).values()) == 1
