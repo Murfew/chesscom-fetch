@@ -1,12 +1,13 @@
 """Terminal output: turns sync summaries and reports into Rich tables."""
 
+from collections import defaultdict
 from datetime import date
 
 from rich.console import Console
 from rich.table import Table
 
 from chesscom_fetch.domain import BAD_SCORE, GOOD_SCORE, Colour, TimeClass
-from chesscom_fetch.reports import OpeningRecord, Record
+from chesscom_fetch.reports import MonthlyRating, OpeningRecord, Record
 from chesscom_fetch.sync import SyncSummary, first_month_in_window
 
 console = Console()
@@ -114,9 +115,18 @@ def _print_no_games(username: str) -> None:
     )
 
 
-def _print_report_header(title: str, username: str, total_games: int) -> None:
+def _print_no_rated_games(username: str) -> None:
+    """Print a dim line saying the player has no saved rated games."""
+    console.print(f"[dim]No rated games saved for {username}.[/dim]")
+
+
+def _print_report_header(
+    title: str, username: str, total_games: int, rated_only: bool = False
+) -> None:
     """Print a report's title: its name, the player and its game count."""
-    console.print(f"{title} for [bold]{username}[/bold] · {total_games} games")
+    console.print(
+        f"{title} for [bold]{username}[/bold] · {total_games} {'rated ' if rated_only else ''}games"
+    )
 
 
 def _report_grid() -> Table:
@@ -152,13 +162,20 @@ def _add_opening_rows(
 
     for opening_record in openings:
         score = opening_record.record.score
-        assert score is not None  # ruff: ignore[assert] -- every family from GROUP BY has at least one game
+        assert score is not None  # ruff: ignore[assert]
         score_style = _score_style(score)
         grid.add_row(
             f"  {opening_record.opening_family}",
             str(opening_record.record.total_games),
             f"[{score_style}]{score:.1%}[/{score_style}]",
         )
+
+
+def _month_label(year: int, month: int) -> str:
+    """Format a year and month as a short label, such as "Nov 2026"."""
+    return date(year, month, 1).strftime(
+        "%b %Y",
+    )
 
 
 def print_sync_summary(
@@ -259,3 +276,75 @@ def print_top_openings(
     openings_grid.add_row()
     _add_opening_rows(openings_grid, Colour.BLACK, black_openings)
     console.print(openings_grid)
+
+
+def print_rating_history(
+    username: str, ratings: list[MonthlyRating], record: Record
+) -> None:
+    """Print a player's average rating per month for each time class they play.
+
+    If the player has no saved games, or none of them are rated, print a
+    one-line message saying so instead.
+
+    Args:
+        username: The player, for the header and the empty-state messages.
+        ratings: Monthly averages from `get_monthly_ratings`, oldest first.
+        record: The player's record across all saved games, to tell "no
+            games at all" apart from "no rated games".
+    """
+    if record.total_games == 0:
+        _print_no_games(username)
+        return
+
+    total_rated_games = sum(rating.total_games for rating in ratings)
+    if total_rated_games == 0:
+        _print_no_rated_games(username)
+        return
+
+    _print_report_header("Rating history", username, total_rated_games, rated_only=True)
+    console.print()
+
+    ratings_by_month: defaultdict[tuple[int, int], dict[TimeClass, MonthlyRating]] = (
+        defaultdict(dict)
+    )
+
+    for rating in ratings:
+        ratings_by_month[rating.year, rating.month][rating.time_class] = rating
+
+    played_time_classes = {rating.time_class for rating in ratings}
+    column_time_classes = [
+        time_class for time_class in TimeClass if time_class in played_time_classes
+    ]
+
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="dim")
+
+    time_class_headers = [
+        header for time_class in column_time_classes for header in (time_class, "")
+    ]
+    time_class_stat_headers = ["avg", "games"] * len(column_time_classes)
+
+    for _ in column_time_classes:
+        grid.add_column(justify="right")
+        grid.add_column(style="dim", justify="right")
+
+    grid.add_row("", *time_class_headers)
+    grid.add_row("", *time_class_stat_headers)
+
+    for (year, month), ratings_by_time_class in ratings_by_month.items():
+        row_values = [_month_label(year, month)]
+        for time_class in column_time_classes:
+            time_class_rating = ratings_by_time_class.get(time_class)
+            if time_class_rating is None:
+                row_values.extend(("[dim]—[/dim]", ""))
+            else:
+                row_values.extend(
+                    (
+                        str(int(time_class_rating.average_rating)),
+                        str(time_class_rating.total_games),
+                    )
+                )
+
+        grid.add_row(*row_values)
+
+    console.print(grid)
