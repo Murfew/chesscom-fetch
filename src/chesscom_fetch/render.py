@@ -73,7 +73,7 @@ def _print_sync_details(summary: SyncSummary) -> None:
         months_info.append(f"{summary.months_unchanged} unchanged")
     if summary.months_completed != 0:
         months_info.append(f"{summary.months_completed} already complete")
-    if len(months_info) != 0:
+    if months_info:
         details_grid.add_row(
             "Months",
             f"{' · '.join(months_info)}",
@@ -90,7 +90,7 @@ def _print_sync_details(summary: SyncSummary) -> None:
         )
     if summary.other != 0:
         skipped_info.append(f"[yellow]{summary.other}[/yellow] other")
-    if len(skipped_info) != 0:
+    if skipped_info:
         skipped_info.append("[dim]all time classes[/dim]")
         details_grid.add_row(
             "Skipped",
@@ -100,7 +100,7 @@ def _print_sync_details(summary: SyncSummary) -> None:
     unknown_codes = []
     for code, count in summary.unknown_result_codes.items():
         unknown_codes.append(f"[yellow]{code} ({count})[/yellow]")
-    if len(unknown_codes) != 0:
+    if unknown_codes:
         details_grid.add_row(
             "", f"[dim]unknown result codes[/dim]: {', '.join(unknown_codes)}"
         )
@@ -156,7 +156,7 @@ def _add_opening_rows(
         f"[bold]As {colour.capitalize()}", "[dim]games[/dim]", "[dim]score[/dim]"
     )
 
-    if len(openings) == 0:
+    if not openings:
         grid.add_row(f"[dim]  No games as {colour.capitalize()}.[/dim]")
         return
 
