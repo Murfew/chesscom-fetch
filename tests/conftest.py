@@ -14,7 +14,6 @@ import chesscom_fetch.cli
 from chesscom_fetch.api_models import Game
 from chesscom_fetch.cli import app
 from chesscom_fetch.client import ChessClient
-from chesscom_fetch.converter import game_to_game_row
 from chesscom_fetch.database import GameRow, init_db
 from chesscom_fetch.domain import Colour, Result, TimeClass
 from tests.helpers import (
