@@ -20,6 +20,7 @@ from chesscom_fetch.render import (
     print_top_openings,
 )
 from chesscom_fetch.reports import (
+    count_games,
     get_monthly_ratings,
     get_most_played_openings,
     get_record,
@@ -187,11 +188,11 @@ def score(
         typer.Argument(callback=_parse_username, help="Chess.com username."),
     ],
 ) -> None:
-    """Show a player's wins, draws, losses and score from saved games.
+    """Show a player's wins, draws, losses and score as White and as Black.
 
-    Score counts a win as 1 point and a draw as ½, as a percentage of games played.
-
-    Run `fetch` first; this command reads only the local database.
+    Score counts a win as 1 point and a draw as ½, as a percentage of the
+    games played with that colour. Run `fetch` first; this command reads
+    only the local database.
 
     \f
     Args:
@@ -199,7 +200,9 @@ def score(
         username: Chess.com username, stripped and lowercased.
     """  # ruff: ignore[escape-sequence-in-docstring]
     config = _as_cli_config(ctx.obj)
-    print_record(username, get_record(config.db_path, username))
+    white_record = get_record(config.db_path, username, Colour.WHITE)
+    black_record = get_record(config.db_path, username, Colour.BLACK)
+    print_record(username, white_record, black_record)
 
 
 @app.command()
@@ -222,10 +225,10 @@ def top_openings(
         username: Chess.com username, stripped and lowercased.
     """  # ruff: ignore[escape-sequence-in-docstring]
     config = _as_cli_config(ctx.obj)
-    record = get_record(config.db_path, username)
+    total_games = count_games(config.db_path, username)
     white_openings = get_most_played_openings(config.db_path, username, Colour.WHITE)
     black_openings = get_most_played_openings(config.db_path, username, Colour.BLACK)
-    print_top_openings(username, white_openings, black_openings, record)
+    print_top_openings(username, white_openings, black_openings, total_games)
 
 
 @app.command()
@@ -250,5 +253,5 @@ def ratings(
     """  # ruff: ignore[escape-sequence-in-docstring]
     config = _as_cli_config(ctx.obj)
     monthly_ratings = get_monthly_ratings(config.db_path, username)
-    record = get_record(config.db_path, username)
-    print_rating_history(username, monthly_ratings, record)
+    total_games = count_games(config.db_path, username)
+    print_rating_history(username, monthly_ratings, total_games)

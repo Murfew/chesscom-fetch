@@ -104,14 +104,15 @@ def _to_monthly_rating(
     )
 
 
-def get_record(db_path: Path, username: str) -> Record:
-    """Count a player's wins, draws and losses in the database.
+def get_record(db_path: Path, username: str, colour: Colour) -> Record:
+    """Count a player's wins, draws and losses in games played as one colour.
 
     Only games already saved by `fetch` are counted; nothing is downloaded.
 
     Args:
         db_path: Path to the SQLite database file.
         username: Chess.com username, lowercased to match stored rows.
+        colour: The side the player had in the games to count.
 
     Returns:
         The player's record. Every count is 0 if no games are stored.
@@ -121,16 +122,36 @@ def get_record(db_path: Path, username: str) -> Record:
         cur.execute(
             """
             SELECT result, COUNT(*) AS count FROM games
-            WHERE username = ?
+            WHERE username = ? AND colour = ?
             GROUP BY result
             """,
-            (username,),
+            (username, colour),
         )
         raw_counts = dict(cur.fetchall())
         return Record(
             wins=raw_counts.get(Result.WIN, 0),
             draws=raw_counts.get(Result.DRAW, 0),
             losses=raw_counts.get(Result.LOSS, 0),
+        )
+
+
+def count_games(db_path: Path, username: str) -> int:
+    """Count every game saved for a player, whatever the colour or rating.
+
+    Only games already saved by `fetch` are counted; nothing is downloaded.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        username: Chess.com username, lowercased to match stored rows.
+
+    Returns:
+        The number of saved games, or 0 if there are none.
+    """
+    with get_connection(db_path) as conn:
+        return int(
+            conn.execute(
+                """SELECT COUNT(*) FROM games WHERE username = ? """, (username,)
+            ).fetchone()[0]
         )
 
 

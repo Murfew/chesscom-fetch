@@ -9,6 +9,7 @@ from chesscom_fetch.reports import (
     MonthlyRating,
     OpeningRecord,
     Record,
+    count_games,
     get_monthly_ratings,
     get_most_played_openings,
     get_record,
@@ -45,12 +46,12 @@ class TestGetRecord:
                 ],
             )
 
-        record = get_record(temp_db, USERNAME_ONE)
+        record = get_record(temp_db, USERNAME_ONE, colour=Colour.WHITE)
 
         assert record == Record(wins=3, draws=1, losses=2)
 
     def test_returns_zeros_when_no_games(self, temp_db: Path) -> None:
-        record = get_record(temp_db, USERNAME_ONE)
+        record = get_record(temp_db, USERNAME_ONE, colour=Colour.WHITE)
 
         assert record == Record()
 
@@ -67,9 +68,64 @@ class TestGetRecord:
                 ],
             )
 
-        record = get_record(temp_db, USERNAME_ONE)
+        record = get_record(temp_db, USERNAME_ONE, colour=Colour.WHITE)
 
         assert record.total_games == 2
+
+    def test_counts_only_requested_colour(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(colour=Colour.WHITE, result=Result.WIN),
+                    build_fake_game_row(colour=Colour.BLACK, result=Result.LOSS),
+                ],
+            )
+
+        white_record = get_record(temp_db, USERNAME_ONE, colour=Colour.WHITE)
+        black_record = get_record(temp_db, USERNAME_ONE, colour=Colour.BLACK)
+
+        assert white_record == Record(wins=1, draws=0, losses=0)
+        assert black_record == Record(wins=0, draws=0, losses=1)
+
+
+class TestCountGames:
+    def test_counts_every_colour_and_rating(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(colour=Colour.WHITE, rated=True),
+                    build_fake_game_row(colour=Colour.WHITE, rated=False),
+                    build_fake_game_row(colour=Colour.BLACK, rated=True),
+                    build_fake_game_row(colour=Colour.BLACK, rated=False),
+                ],
+            )
+
+        assert count_games(temp_db, USERNAME_ONE) == 4
+
+    def test_returns_zero_when_no_games(self, temp_db: Path) -> None:
+        assert count_games(temp_db, USERNAME_ONE) == 0
+
+    def test_counts_only_requested_player(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(username=USERNAME_ONE),
+                    build_fake_game_row(username=USERNAME_TWO),
+                    build_fake_game_row(username=USERNAME_TWO),
+                ],
+            )
+
+        assert count_games(temp_db, USERNAME_ONE) == 1
+        assert count_games(temp_db, USERNAME_TWO) == 2
 
 
 class TestRecord:

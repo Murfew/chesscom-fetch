@@ -129,12 +129,15 @@ def _print_report_header(
     )
 
 
-def _report_grid() -> Table:
-    """Return an empty grid: a dim label column, then two right-aligned columns."""
+def _report_grid(value_columns: int) -> Table:
+    """Return an empty grid for a report.
+
+    The grid has a dim label column, then `value_columns` right-aligned columns.
+    """
     grid = Table.grid(padding=(0, 2))
     grid.add_column(style="dim")
-    grid.add_column(justify="right")
-    grid.add_column(justify="right")
+    for _ in range(value_columns):
+        grid.add_column(justify="right")
 
     return grid
 
@@ -178,6 +181,24 @@ def _month_label(year: int, month: int) -> str:
     )
 
 
+def _count_cells(count: int, record: Record) -> tuple[str, str]:
+    if record.total_games == 0:
+        return "—", ""
+
+    return str(count), f"{count / record.total_games:.1%}"
+
+
+def _score_cells(record: Record) -> tuple[str, str]:
+    if record.score is None:
+        return "—", ""
+
+    score_style = _score_style(record.score)
+    return (
+        f"{record.points:g} / {record.total_games}",
+        f"[{score_style}]{record.score:.1%}[/{score_style}]",
+    )
+
+
 def print_sync_summary(
     summary: SyncSummary,
     time_classes: list[TimeClass],
@@ -202,47 +223,46 @@ def print_sync_summary(
     _print_sync_details(summary)
 
 
-def print_record(username: str, record: Record) -> None:
-    """Print a player's wins, draws, losses and score, or how to fetch games first.
+def print_record(username: str, white: Record, black: Record) -> None:
+    """Print a player's record as White and as Black, or how to fetch games first.
 
     Args:
         username: The player, for the header and the empty-state hint.
-        record: The player's record across all saved games.
+        white: The player's record in games played as White.
+        black: The player's record in games played as Black.
     """
-    if record.total_games == 0:
+    total_games = white.total_games + black.total_games
+
+    if total_games == 0:
         _print_no_games(username)
         return
 
-    _print_report_header("Record", username, record.total_games)
+    _print_report_header("Record", username, total_games)
     console.print()
 
-    record_grid = _report_grid()
+    record_grid = _report_grid(4)
+    record_grid.add_row("", "[bold]White[/bold]", "", "[bold]Black[/bold]")
 
     record_grid.add_row(
         "wins",
-        str(record.wins),
-        f"{record.wins / record.total_games:.1%}",
+        *_count_cells(white.wins, white),
+        *_count_cells(black.wins, black),
         style="green",
     )
     record_grid.add_row(
-        "draws", str(record.draws), f"{record.draws / record.total_games:.1%}"
+        "draws",
+        *_count_cells(white.draws, white),
+        *_count_cells(black.draws, black),
     )
     record_grid.add_row(
         "losses",
-        str(record.losses),
-        f"{record.losses / record.total_games:.1%}",
+        *_count_cells(white.losses, white),
+        *_count_cells(black.losses, black),
         style="red",
     )
     record_grid.add_row()
 
-    score = record.score
-    assert score is not None  # ruff: ignore[assert] -- the total_games == 0 return above rules out None
-    score_style = _score_style(score)
-    record_grid.add_row(
-        "score",
-        f"{record.points:g} / {record.total_games}",
-        f"[{score_style}]{score:.1%}[/{score_style}]",
-    )
+    record_grid.add_row("score", *_score_cells(white), *_score_cells(black))
 
     console.print(record_grid)
 
@@ -251,7 +271,7 @@ def print_top_openings(
     username: str,
     white_openings: list[OpeningRecord],
     black_openings: list[OpeningRecord],
-    record: Record,
+    total_games: int,
 ) -> None:
     """Print the five most-played opening families as White and as Black.
 
@@ -261,17 +281,17 @@ def print_top_openings(
         username: The player, for the header and the empty-state hint.
         white_openings: Most-played families as White, most-played first.
         black_openings: Most-played families as Black, most-played first.
-        record: The player's record across all saved games, for the header's
-            game count and to tell when there are no games at all.
+        total_games: Number of the player's saved games, for the header and
+            to tell when there are none.
     """
-    if record.total_games == 0:
+    if total_games == 0:
         _print_no_games(username)
         return
 
-    _print_report_header("Top openings", username, record.total_games)
+    _print_report_header("Top openings", username, total_games)
     console.print()
 
-    openings_grid = _report_grid()
+    openings_grid = _report_grid(2)
     _add_opening_rows(openings_grid, Colour.WHITE, white_openings)
     openings_grid.add_row()
     _add_opening_rows(openings_grid, Colour.BLACK, black_openings)
@@ -279,7 +299,7 @@ def print_top_openings(
 
 
 def print_rating_history(
-    username: str, ratings: list[MonthlyRating], record: Record
+    username: str, ratings: list[MonthlyRating], total_games: int
 ) -> None:
     """Print a player's average rating per month for each time class they play.
 
@@ -289,10 +309,11 @@ def print_rating_history(
     Args:
         username: The player, for the header and the empty-state messages.
         ratings: Monthly averages from `get_monthly_ratings`, oldest first.
-        record: The player's record across all saved games, to tell "no
-            games at all" apart from "no rated games".
+        total_games: Number of the player's saved games, rated or not, to
+            tell "no games at all" apart from "no rated games".
+
     """
-    if record.total_games == 0:
+    if total_games == 0:
         _print_no_games(username)
         return
 

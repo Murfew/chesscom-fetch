@@ -123,14 +123,43 @@ class TestFetch:
 
 
 class TestScore:
-    def test_prints_record(
+    def test_prints_record_by_colour(
         self, build_fake_game_row: BuildFakeGameRow, temp_db: Path, runner: CliRunner
     ) -> None:
         with get_connection(temp_db) as conn:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(result=Result.WIN),
+                    build_fake_game_row(result=Result.WIN, colour=Colour.WHITE),
+                    build_fake_game_row(result=Result.WIN, colour=Colour.WHITE),
+                    build_fake_game_row(result=Result.DRAW, colour=Colour.WHITE),
+                    build_fake_game_row(result=Result.LOSS, colour=Colour.WHITE),
+                    build_fake_game_row(result=Result.WIN, colour=Colour.BLACK),
+                    build_fake_game_row(result=Result.DRAW, colour=Colour.BLACK),
+                    build_fake_game_row(result=Result.DRAW, colour=Colour.BLACK),
+                    build_fake_game_row(result=Result.LOSS, colour=Colour.BLACK),
+                ],
+            )
+
+        result = runner.invoke(app, ["score", USERNAME_ONE])
+
+        assert result.exit_code == 0
+        assert f"{USERNAME_ONE} · 8 games" in result.stdout
+
+        rows = [line.strip().split() for line in result.stdout.splitlines()]
+
+        assert ["wins", "2", "50.0%", "1", "25.0%"] in rows
+        assert ["draws", "1", "25.0%", "2", "50.0%"] in rows
+        assert ["losses", "1", "25.0%", "1", "25.0%"] in rows
+        assert ["score", "2.5", "/", "4", "62.5%", "2", "/", "4", "50.0%"] in rows
+
+    def test_prints_dash_for_colour_without_games(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow, runner: CliRunner
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
                     build_fake_game_row(result=Result.WIN),
                     build_fake_game_row(result=Result.DRAW),
                     build_fake_game_row(result=Result.LOSS),
@@ -138,16 +167,14 @@ class TestScore:
             )
 
         result = runner.invoke(app, ["score", USERNAME_ONE])
-
         assert result.exit_code == 0
-        assert f"{USERNAME_ONE} · 4 games" in result.stdout
 
         rows = [line.strip().split() for line in result.stdout.splitlines()]
 
-        assert ["wins", "2", "50.0%"] in rows
-        assert ["draws", "1", "25.0%"] in rows
-        assert ["losses", "1", "25.0%"] in rows
-        assert ["score", "2.5", "/", "4", "62.5%"] in rows
+        assert ["wins", "1", "33.3%", "—"] in rows
+        assert ["draws", "1", "33.3%", "—"] in rows
+        assert ["losses", "1", "33.3%", "—"] in rows
+        assert ["score", "1.5", "/", "3", "50.0%", "—"] in rows
 
     def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["score", USERNAME_ONE])
