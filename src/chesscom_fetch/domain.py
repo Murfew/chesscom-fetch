@@ -13,10 +13,12 @@ UNKNOWN_OPENING_FAMILY = (
 class TimeClass(StrEnum):
     """Chess.com time controls, matching the API's time_class values."""
 
-    BULLET = "bullet"
-    BLITZ = "blitz"
-    RAPID = "rapid"
+    # Declaration order is the display order in reports and the fetch summary.
+
     DAILY = "daily"
+    RAPID = "rapid"
+    BLITZ = "blitz"
+    BULLET = "bullet"
 
 
 class Colour(StrEnum):
