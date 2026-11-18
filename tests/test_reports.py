@@ -17,8 +17,8 @@ from tests.helpers import (
     LONDON_SYSTEM,
     SCANDINAVIAN_DEFENSE,
     SICILIAN_DEFENSE,
-    USERNAME_BLACK,
-    USERNAME_WHITE,
+    USERNAME_ONE,
+    USERNAME_TWO,
     VIENNA_GAMBIT,
     BuildFakeGameRow,
 )
@@ -42,12 +42,12 @@ class TestGetRecord:
                 ],
             )
 
-        record = get_record(temp_db, USERNAME_WHITE)
+        record = get_record(temp_db, USERNAME_ONE)
 
         assert record == Record(wins=3, draws=1, losses=2)
 
     def test_returns_zeros_when_no_games(self, temp_db: Path) -> None:
-        record = get_record(temp_db, USERNAME_WHITE)
+        record = get_record(temp_db, USERNAME_ONE)
 
         assert record == Record()
 
@@ -58,15 +58,15 @@ class TestGetRecord:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(username=USERNAME_WHITE),
-                    build_fake_game_row(username=USERNAME_WHITE),
-                    build_fake_game_row(username=USERNAME_BLACK),
+                    build_fake_game_row(username=USERNAME_ONE),
+                    build_fake_game_row(username=USERNAME_ONE),
+                    build_fake_game_row(username=USERNAME_TWO),
                 ],
             )
 
-        white_record = get_record(temp_db, USERNAME_WHITE)
+        record = get_record(temp_db, USERNAME_ONE)
 
-        assert white_record.total_games == 2
+        assert record.total_games == 2
 
 
 class TestRecord:
@@ -101,7 +101,7 @@ class TestGetMostPlayedOpenings:
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0].opening_family == FRENCH_DEFENSE
         assert openings[1].opening_family == CARO_KANN_DEFENSE
 
@@ -117,7 +117,7 @@ class TestGetMostPlayedOpenings:
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0].opening_family == CARO_KANN_DEFENSE
         assert openings[1].opening_family == FRENCH_DEFENSE
 
@@ -140,7 +140,7 @@ class TestGetMostPlayedOpenings:
         openings = [
             opening_record.opening_family
             for opening_record in get_most_played_openings(
-                temp_db, USERNAME_WHITE, Colour.WHITE
+                temp_db, USERNAME_ONE, Colour.WHITE
             )
         ]
         assert len(openings) == 5
@@ -153,11 +153,13 @@ class TestGetMostPlayedOpenings:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(opening_family=FRENCH_DEFENSE),
+                    build_fake_game_row(
+                        opening_family=FRENCH_DEFENSE, colour=Colour.WHITE
+                    ),
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.BLACK)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.BLACK)
         assert len(openings) == 0
 
     def test_counts_only_requested_colour(
@@ -176,7 +178,7 @@ class TestGetMostPlayedOpenings:
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.BLACK)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.BLACK)
         assert len(openings) == 1
         assert openings[0].opening_family == CARO_KANN_DEFENSE
 
@@ -188,15 +190,15 @@ class TestGetMostPlayedOpenings:
                 conn,
                 [
                     build_fake_game_row(
-                        username=USERNAME_WHITE, opening_family=FRENCH_DEFENSE
+                        username=USERNAME_ONE, opening_family=FRENCH_DEFENSE
                     ),
                     build_fake_game_row(
-                        username=USERNAME_BLACK, opening_family=CARO_KANN_DEFENSE
+                        username=USERNAME_TWO, opening_family=CARO_KANN_DEFENSE
                     ),
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert len(openings) == 1
         assert openings[0].opening_family == FRENCH_DEFENSE
 
@@ -231,7 +233,7 @@ class TestGetMostPlayedOpenings:
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0] == OpeningRecord(
             opening_family=FRENCH_DEFENSE, record=Record(wins=2, draws=1, losses=1)
         )
@@ -261,7 +263,7 @@ class TestGetMostPlayedOpenings:
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0] == OpeningRecord(
             opening_family=UNKNOWN_OPENING_FAMILY,
             record=Record(wins=2, draws=1, losses=1),
@@ -292,6 +294,6 @@ class TestGetMostPlayedOpenings:
                 ],
             )
 
-        openings = get_most_played_openings(temp_db, USERNAME_WHITE, Colour.WHITE)
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0].opening_family == FRENCH_DEFENSE
         assert openings[1].opening_family == CARO_KANN_DEFENSE

@@ -21,14 +21,14 @@
         "rating": 1633,
         "result": "win",
         "@id": "https://api.chess.com/pub/player/mainline_novelty",
-        "username": "TestPlayerWhite",
+        "username": "TestPlayerOne",
         "uuid": "9c535e34-2dd0-11dd-8006-000000000000"
       },
       "black": {
         "rating": 1920,
         "result": "resigned",
         "@id": "https://api.chess.com/pub/player/erik",
-        "username": "TestPlayerBlack",
+        "username": "TestPlayerTwo",
         "uuid": "fe696c00-fcba-11db-8029-000000000000"
       },
       "eco": "https://www.chess.com/openings/Modern-Defense-Standard-Two-Knights-Suttles-Variation-5.Be3-Nf6-6.Qd2"
@@ -54,14 +54,14 @@
         "rating": 1898,
         "result": "resigned",
         "@id": "https://api.chess.com/pub/player/nym",
-        "username": "TestPlayerWhite",
+        "username": "TestPlayerOne",
         "uuid": "d5f6f9fa-c229-11dd-8001-000000000000"
       },
       "black": {
         "rating": 1920,
         "result": "win",
         "@id": "https://api.chess.com/pub/player/erik",
-        "username": "TestPlayerBlack",
+        "username": "TestPlayerTwo",
         "uuid": "fe696c00-fcba-11db-8029-000000000000"
       },
       "eco": "https://www.chess.com/openings/Kings-Gambit-Accepted-Modern-Defense-4.exd5-Bd6"
@@ -83,14 +83,14 @@
         "rating": 2005,
         "result": "resigned",
         "@id": "https://api.chess.com/pub/player/flirtyking",
-        "username": "TestPlayerWhite",
+        "username": "TestPlayerOne",
         "uuid": "adf075c0-e8cc-11dd-8044-000000000000"
       },
       "black": {
         "rating": 1945,
         "result": "win",
         "@id": "https://api.chess.com/pub/player/erik",
-        "username": "TestPlayerBlack",
+        "username": "TestPlayerTwo",
         "uuid": "fe696c00-fcba-11db-8029-000000000000"
       },
       "eco": "https://www.chess.com/openings/Kings-Indian-Defense-Orthodox-Variation-6...c5-7.d5-Na6-8.O-O",

@@ -11,7 +11,7 @@ from chesscom_fetch.sync_store import (
 from tests.helpers import (
     ARCHIVE_MONTH_URLS,
     ETAG,
-    USERNAME_BLACK,
+    USERNAME_TWO,
     BuildFakeGameRow,
     count_games_table_rows,
 )
@@ -41,7 +41,7 @@ class TestAddGames:
     ) -> None:
         with get_connection(temp_db) as conn:
             assert add_games(conn, [build_fake_game_row()]) == 1
-            assert add_games(conn, [build_fake_game_row(username=USERNAME_BLACK)]) == 1
+            assert add_games(conn, [build_fake_game_row(username=USERNAME_TWO)]) == 1
 
         assert count_games_table_rows(temp_db) == 2
 

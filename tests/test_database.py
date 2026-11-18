@@ -85,8 +85,7 @@ class TestInitDb:
         build_fake_game_row: BuildFakeGameRow,
         overrides: dict[str, Any],
     ) -> None:
-
         with pytest.raises(IntegrityError), get_connection(temp_db) as conn:
-            add_games(conn, [build_fake_game_row(**overrides)])
+            add_games(conn, [build_fake_game_row().model_copy(update=overrides)])
 
         assert count_games_table_rows(temp_db) == 0

@@ -18,7 +18,7 @@ from tests.helpers import (
     ARCHIVE_LIST_URL,
     ARCHIVE_MONTH_URLS,
     ETAG,
-    USERNAME_WHITE,
+    USERNAME_ONE,
     MakeChessClient,
     build_archive_list_response,
     build_archive_month_response,
@@ -72,7 +72,7 @@ class TestFetchArchiveList:
         client = make_chess_client(handler)
         with pytest.raises(
             PlayerNotFoundError,
-            match=f"404.*{USERNAME_WHITE}",
+            match=f"404.*{USERNAME_ONE}",
         ):
             client.fetch_archive_list()
 

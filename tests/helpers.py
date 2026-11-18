@@ -14,13 +14,13 @@ from chesscom_fetch.domain import Colour, Result, TimeClass
 
 # Players & Dates
 
-USERNAME_WHITE = "testplayerwhite"  # white player from fake_game.json
-USERNAME_BLACK = "testplayerblack"  # black player from fake_game.json
+USERNAME_ONE = "testplayerone"
+USERNAME_TWO = "testplayertwo"
 FETCH_DATE = date(2026, 11, 9)
 
 # Chess.com API
 
-PLAYER_GAMES_URL = f"https://api.chess.com/pub/player/{USERNAME_WHITE}/games"
+PLAYER_GAMES_URL = f"https://api.chess.com/pub/player/{USERNAME_ONE}/games"
 ARCHIVE_MONTH_URLS = [
     f"{PLAYER_GAMES_URL}/2026/01",
     f"{PLAYER_GAMES_URL}/2026/02",

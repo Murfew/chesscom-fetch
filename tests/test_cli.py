@@ -17,7 +17,7 @@ from tests.helpers import (
     LONDON_SYSTEM,
     SCANDINAVIAN_DEFENSE,
     SICILIAN_DEFENSE,
-    USERNAME_WHITE,
+    USERNAME_ONE,
     VIENNA_GAMBIT,
     BuildFakeGameRow,
     RunFetch,
@@ -41,7 +41,7 @@ class TestFetch:
         result = run_fetch(response_by_url)
 
         assert result.exit_code == 0
-        assert f"Synced {USERNAME_WHITE}" in result.stdout
+        assert f"Synced {USERNAME_ONE}" in result.stdout
         assert ["rapid", "1"] in [
             line.strip().split() for line in result.stdout.splitlines()
         ]
@@ -97,12 +97,12 @@ class TestFetch:
         ("arguments", "expected_message"),
         [
             pytest.param(
-                [USERNAME_WHITE, "--months", "0"],
+                [USERNAME_ONE, "--months", "0"],
                 "Invalid value for '--months'",
                 id="months-below-one",
             ),
             pytest.param(
-                [USERNAME_WHITE, "--time-class", "unknown"],
+                [USERNAME_ONE, "--time-class", "unknown"],
                 "Invalid value for '--time-class'",
                 id="unknown-time-class",
             ),
@@ -137,10 +137,10 @@ class TestScore:
                 ],
             )
 
-        result = runner.invoke(app, ["score", USERNAME_WHITE])
+        result = runner.invoke(app, ["score", USERNAME_ONE])
 
         assert result.exit_code == 0
-        assert f"{USERNAME_WHITE} · 4 games" in result.stdout
+        assert f"{USERNAME_ONE} · 4 games" in result.stdout
 
         rows = [line.strip().split() for line in result.stdout.splitlines()]
 
@@ -150,10 +150,10 @@ class TestScore:
         assert ["score", "2.5", "/", "4", "62.5%"] in rows
 
     def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
-        result = runner.invoke(app, ["score", USERNAME_WHITE])
+        result = runner.invoke(app, ["score", USERNAME_ONE])
 
         assert result.exit_code == 0
-        assert f"No games saved for {USERNAME_WHITE}" in result.stdout
+        assert f"No games saved for {USERNAME_ONE}" in result.stdout
 
 
 class TestTopOpenings:
@@ -202,10 +202,10 @@ class TestTopOpenings:
                 ],
             )
 
-        result = runner.invoke(app, ["top-openings", USERNAME_WHITE])
+        result = runner.invoke(app, ["top-openings", USERNAME_ONE])
 
         assert result.exit_code == 0
-        assert f"{USERNAME_WHITE} · 7 games" in result.stdout
+        assert f"{USERNAME_ONE} · 7 games" in result.stdout
 
         rows = [line.strip().split() for line in result.stdout.splitlines()]
 
@@ -225,12 +225,12 @@ class TestTopOpenings:
         with get_connection(temp_db) as conn:
             add_games(conn, [build_fake_game_row()])
 
-        result = runner.invoke(app, ["top-openings", USERNAME_WHITE])
+        result = runner.invoke(app, ["top-openings", USERNAME_ONE])
         assert result.exit_code == 0
         assert "No games as Black." in result.stdout
 
     def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
-        result = runner.invoke(app, ["top-openings", USERNAME_WHITE])
+        result = runner.invoke(app, ["top-openings", USERNAME_ONE])
 
         assert result.exit_code == 0
-        assert f"No games saved for {USERNAME_WHITE}" in result.stdout
+        assert f"No games saved for {USERNAME_ONE}" in result.stdout

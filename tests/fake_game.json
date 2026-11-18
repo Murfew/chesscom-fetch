@@ -18,14 +18,14 @@
     "rating": 1187,
     "result": "resigned",
     "@id": "https://api.chess.com/pub/player/testplayerwhite",
-    "username": "TestPlayerWhite",
+    "username": "TestPlayerOne",
     "uuid": "a1b2c3d4-1111-11ee-aaaa-000000000001"
   },
   "black": {
     "rating": 1204,
     "result": "win",
     "@id": "https://api.chess.com/pub/player/testplayerblack",
-    "username": "TestPlayerBlack",
+    "username": "TestPlayerTwo",
     "uuid": "a1b2c3d4-2222-11ee-bbbb-000000000002"
   },
   "eco": "https://www.chess.com/openings/Caro-Kann-Defense-Advance-Variation"

@@ -25,7 +25,7 @@ from tests.helpers import (
     ARCHIVE_LIST_URL,
     ETAG,
     UNKNOWN_API_RESULT_CODE,
-    USERNAME_WHITE,
+    USERNAME_ONE,
     MakeChessClient,
     ResponseByUrl,
     build_archive_list_response,
@@ -182,7 +182,7 @@ class TestSync:
         return sync(
             chess_client=chess_client,
             db_path=db_path,
-            username=USERNAME_WHITE,
+            username=USERNAME_ONE,
             months=months,
             today=self.TODAY,
         )

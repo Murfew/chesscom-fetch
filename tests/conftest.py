@@ -16,10 +16,11 @@ from chesscom_fetch.cli import app
 from chesscom_fetch.client import ChessClient
 from chesscom_fetch.converter import game_to_game_row
 from chesscom_fetch.database import GameRow, init_db
-from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result, TimeClass
+from chesscom_fetch.domain import Colour, Result, TimeClass
 from tests.helpers import (
+    CARO_KANN_DEFENSE,
     FETCH_DATE,
-    USERNAME_WHITE,
+    USERNAME_ONE,
     BuildFakeGameRow,
     Handler,
     MakeChessClient,
@@ -76,35 +77,42 @@ def fake_game() -> Game:
 
 
 @pytest.fixture
-def build_fake_game_row(fake_game: Game) -> BuildFakeGameRow:
+def build_fake_game_row() -> BuildFakeGameRow:
+    """Return a builder for game rows that sets only the fields a test names.
+
+    A bare row is a rated rapid game that `USERNAME_ONE` lost as White in the
+    Caro-Kann on 2026-11-05, with White rated below Black. Each row gets a
+    unique URL, so rows never collide on insert.
+    """
+
     counter = count(1)
-    fake_game_row = game_to_game_row(USERNAME_WHITE, fake_game, FETCH_DATE)
 
     def _build_fake_game_row(
         *,
-        result: Result = fake_game_row.result,
-        username: str = fake_game_row.username,
-        opening_family: str = fake_game_row.opening_family,
-        colour: Colour = fake_game_row.colour,
-        end_date: str = fake_game_row.end_date,
-        time_class: TimeClass = fake_game_row.time_class,
-        rated: bool = fake_game_row.rated,
-        white_rating: int = fake_game_row.white_rating,
-        black_rating: int = fake_game_row.black_rating,
+        result: Result = Result.LOSS,
+        username: str = USERNAME_ONE,
+        opening_family: str = CARO_KANN_DEFENSE,
+        colour: Colour = Colour.WHITE,
+        end_date: str = "2026-11-05",
+        time_class: TimeClass = TimeClass.RAPID,
+        rated: bool = True,
+        white_rating: int = 1000,
+        black_rating: int = 1200,
     ) -> GameRow:
-        return fake_game_row.model_copy(
-            update={
-                "url": f"https://www.chess.com/game/live/{next(counter)}",
-                "result": result,
-                "username": username,
-                "opening_family": opening_family,
-                "colour": colour,
-                "end_date": end_date,
-                "time_class": time_class,
-                "rated": rated,
-                "white_rating": white_rating,
-                "black_rating": black_rating,
-            }
+        return GameRow(
+            url=f"https://www.chess.com/game/live/{next(counter)}",
+            result=result,
+            username=username,
+            opening_family=opening_family,
+            colour=colour,
+            end_date=end_date,
+            time_class=time_class,
+            rated=rated,
+            white_rating=white_rating,
+            black_rating=black_rating,
+            pgn="",
+            move_count=0,
+            fetch_date=FETCH_DATE.isoformat(),
         )
 
     return _build_fake_game_row
@@ -120,7 +128,7 @@ def make_chess_client(mocker: MockFixture) -> MakeChessClient:
     ) -> ChessClient:
         return ChessClient(
             Client(transport=MockTransport(handler)),
-            USERNAME_WHITE,
+            USERNAME_ONE,
             wait_mock if wait_mock is not None else mocker.MagicMock(),
         )
 
@@ -168,6 +176,6 @@ def run_fetch(
         response_by_url: ResponseByUrl, extra_args: list[str] | None = None
     ) -> RunnerResult:
         patch_make_chess_client(response_by_url)
-        return runner.invoke(app, ["fetch", USERNAME_WHITE, *(extra_args or [])])
+        return runner.invoke(app, ["fetch", USERNAME_ONE, *(extra_args or [])])
 
     return _run_fetch
