@@ -234,3 +234,72 @@ class TestTopOpenings:
 
         assert result.exit_code == 0
         assert f"No games saved for {USERNAME_ONE}" in result.stdout
+
+
+class TestRatings:
+    def test_prints_rating_history(
+        self, runner: CliRunner, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        time_class=TimeClass.BLITZ,
+                        end_date="2026-09-01",
+                        white_rating=1000,
+                    ),
+                    build_fake_game_row(
+                        time_class=TimeClass.BLITZ,
+                        end_date="2026-09-01",
+                        white_rating=1001,
+                    ),
+                    build_fake_game_row(
+                        time_class=TimeClass.BLITZ,
+                        end_date="2026-09-01",
+                        white_rating=1001,
+                    ),
+                    build_fake_game_row(
+                        time_class=TimeClass.RAPID,
+                        end_date="2026-11-01",
+                        white_rating=1200,
+                    ),
+                    build_fake_game_row(
+                        time_class=TimeClass.RAPID,
+                        end_date="2026-11-01",
+                        white_rating=3000,
+                        rated=False,
+                    ),
+                ],
+            )
+
+        result = runner.invoke(app, ["ratings", USERNAME_ONE])
+
+        assert result.exit_code == 0
+        assert f"{USERNAME_ONE} · 4 rated games" in result.stdout
+
+        rows = [line.strip().split() for line in result.stdout.splitlines()]
+        september_row = ["Sep", "2026", "—", "1001", "3"]
+        november_row = ["Nov", "2026", "1200", "1", "—"]
+
+        assert ["rapid", "blitz"] in rows
+        assert september_row in rows
+        assert november_row in rows
+        assert rows.index(september_row) < rows.index(november_row)
+
+    def test_prints_message_when_no_rated_games(
+        self, runner: CliRunner, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(conn, [build_fake_game_row(rated=False)])
+
+        result = runner.invoke(app, ["ratings", USERNAME_ONE])
+
+        assert result.exit_code == 0
+        assert f"No rated games saved for {USERNAME_ONE}" in result.stdout
+
+    def test_prints_message_when_no_games(self, runner: CliRunner) -> None:
+        result = runner.invoke(app, ["ratings", USERNAME_ONE])
+
+        assert result.exit_code == 0
+        assert f"No games saved for {USERNAME_ONE}" in result.stdout
