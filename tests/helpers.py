@@ -10,7 +10,7 @@ from typer.testing import Result as RunnerResult
 from chesscom_fetch.api_models import Game
 from chesscom_fetch.client import ChessClient
 from chesscom_fetch.database import GameRow, get_connection
-from chesscom_fetch.domain import Colour, Result
+from chesscom_fetch.domain import Colour, Result, TimeClass
 
 # Players & Dates
 
@@ -61,10 +61,16 @@ class RunFetch(Protocol):
 class BuildFakeGameRow(Protocol):
     def __call__(
         self,
+        *,
         result: Result = ...,
         username: str = ...,
         opening_family: str = ...,
         colour: Colour = ...,
+        end_date: str = ...,
+        time_class: TimeClass = ...,
+        rated: bool = ...,
+        white_rating: int = ...,
+        black_rating: int = ...,
     ) -> GameRow: ...
 
 

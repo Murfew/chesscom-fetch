@@ -33,12 +33,12 @@ class TestGetRecord:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(Result.WIN),
-                    build_fake_game_row(Result.WIN),
-                    build_fake_game_row(Result.WIN),
-                    build_fake_game_row(Result.DRAW),
-                    build_fake_game_row(Result.LOSS),
-                    build_fake_game_row(Result.LOSS),
+                    build_fake_game_row(result=Result.WIN),
+                    build_fake_game_row(result=Result.WIN),
+                    build_fake_game_row(result=Result.WIN),
+                    build_fake_game_row(result=Result.DRAW),
+                    build_fake_game_row(result=Result.LOSS),
+                    build_fake_game_row(result=Result.LOSS),
                 ],
             )
 
@@ -246,10 +246,18 @@ class TestGetMostPlayedOpenings:
             add_games(
                 conn,
                 [
-                    build_fake_game_row(result=Result.WIN),
-                    build_fake_game_row(result=Result.WIN),
-                    build_fake_game_row(result=Result.DRAW),
-                    build_fake_game_row(result=Result.LOSS),
+                    build_fake_game_row(
+                        result=Result.WIN, opening_family=UNKNOWN_OPENING_FAMILY
+                    ),
+                    build_fake_game_row(
+                        result=Result.WIN, opening_family=UNKNOWN_OPENING_FAMILY
+                    ),
+                    build_fake_game_row(
+                        result=Result.DRAW, opening_family=UNKNOWN_OPENING_FAMILY
+                    ),
+                    build_fake_game_row(
+                        result=Result.LOSS, opening_family=UNKNOWN_OPENING_FAMILY
+                    ),
                 ],
             )
 

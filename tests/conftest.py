@@ -16,7 +16,7 @@ from chesscom_fetch.cli import app
 from chesscom_fetch.client import ChessClient
 from chesscom_fetch.converter import game_to_game_row
 from chesscom_fetch.database import GameRow, init_db
-from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result
+from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result, TimeClass
 from tests.helpers import (
     FETCH_DATE,
     USERNAME_WHITE,
@@ -85,10 +85,16 @@ def build_fake_game_row(fake_game_row: GameRow) -> BuildFakeGameRow:
     counter = count(1)
 
     def _build_fake_game_row(
-        result: Result = Result.WIN,
-        username: str = USERNAME_WHITE,
-        opening_family: str = UNKNOWN_OPENING_FAMILY,
-        colour: Colour = Colour.WHITE,
+        *,
+        result: Result = fake_game_row.result,
+        username: str = fake_game_row.username,
+        opening_family: str = fake_game_row.opening_family,
+        colour: Colour = fake_game_row.colour,
+        end_date: str = fake_game_row.end_date,
+        time_class: TimeClass = fake_game_row.time_class,
+        rated: bool = fake_game_row.rated,
+        white_rating: int = fake_game_row.white_rating,
+        black_rating: int = fake_game_row.black_rating,
     ) -> GameRow:
         return fake_game_row.model_copy(
             update={
@@ -97,6 +103,11 @@ def build_fake_game_row(fake_game_row: GameRow) -> BuildFakeGameRow:
                 "username": username,
                 "opening_family": opening_family,
                 "colour": colour,
+                "end_date": end_date,
+                "time_class": time_class,
+                "rated": rated,
+                "white_rating": white_rating,
+                "black_rating": black_rating,
             }
         )
 
