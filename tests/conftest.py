@@ -76,13 +76,9 @@ def fake_game() -> Game:
 
 
 @pytest.fixture
-def fake_game_row(fake_game: Game) -> GameRow:
-    return game_to_game_row(USERNAME_WHITE, fake_game, FETCH_DATE)
-
-
-@pytest.fixture
-def build_fake_game_row(fake_game_row: GameRow) -> BuildFakeGameRow:
+def build_fake_game_row(fake_game: Game) -> BuildFakeGameRow:
     counter = count(1)
+    fake_game_row = game_to_game_row(USERNAME_WHITE, fake_game, FETCH_DATE)
 
     def _build_fake_game_row(
         *,

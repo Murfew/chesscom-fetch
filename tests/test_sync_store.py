@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import ClassVar
 
-from chesscom_fetch.database import GameRow, get_connection
+from chesscom_fetch.database import get_connection
 from chesscom_fetch.sync_store import (
     ArchiveStateRow,
     add_games,
@@ -12,38 +12,36 @@ from tests.helpers import (
     ARCHIVE_MONTH_URLS,
     ETAG,
     USERNAME_BLACK,
+    BuildFakeGameRow,
     count_games_table_rows,
 )
 
 
 class TestAddGames:
     def test_returns_number_of_new_games(
-        self, fake_game_row: GameRow, temp_db: Path
+        self, build_fake_game_row: BuildFakeGameRow, temp_db: Path
     ) -> None:
         with get_connection(temp_db) as conn:
-            assert add_games(conn, [fake_game_row]) == 1
+            assert add_games(conn, [build_fake_game_row()]) == 1
 
         assert count_games_table_rows(temp_db) == 1
 
     def test_skips_games_already_stored(
-        self, fake_game_row: GameRow, temp_db: Path
+        self, build_fake_game_row: BuildFakeGameRow, temp_db: Path
     ) -> None:
         with get_connection(temp_db) as conn:
-            assert add_games(conn, [fake_game_row]) == 1
-            assert add_games(conn, [fake_game_row]) == 0
+            game_row = build_fake_game_row()
+            assert add_games(conn, [game_row]) == 1
+            assert add_games(conn, [game_row]) == 0
 
         assert count_games_table_rows(temp_db) == 1
 
     def test_stores_same_game_for_each_player(
-        self, fake_game_row: GameRow, temp_db: Path
+        self, build_fake_game_row: BuildFakeGameRow, temp_db: Path
     ) -> None:
         with get_connection(temp_db) as conn:
-            assert add_games(conn, [fake_game_row]) == 1
-
-            fake_game_row_black_player = fake_game_row.model_copy(
-                update={"username": USERNAME_BLACK}
-            )
-            assert add_games(conn, [fake_game_row_black_player]) == 1
+            assert add_games(conn, [build_fake_game_row()]) == 1
+            assert add_games(conn, [build_fake_game_row(username=USERNAME_BLACK)]) == 1
 
         assert count_games_table_rows(temp_db) == 2
 
