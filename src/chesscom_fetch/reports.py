@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlite3 import Cursor
 
 from chesscom_fetch.database import get_connection
-from chesscom_fetch.domain import Colour, Result
+from chesscom_fetch.domain import Colour, Result, TimeClass
 
 
 @dataclass
@@ -67,6 +67,40 @@ def _to_opening_record(
     return OpeningRecord(
         opening_family=opening_family,
         record=Record(wins=wins, draws=draws, losses=losses),
+    )
+
+
+@dataclass
+class MonthlyRating:
+    """A player's average rating in one time class over one calendar month.
+
+    Attributes:
+        year: Calendar year, such as 2026.
+        month: Month number, 1 for January to 12 for December.
+        time_class: The time class the rating belongs to.
+        average_rating: Mean of the player's own rating across the month's
+            rated games in this time class.
+        total_games: How many rated games the average is taken over.
+    """
+
+    year: int
+    month: int
+    time_class: TimeClass
+    average_rating: float
+    total_games: int
+
+
+def _to_monthly_rating(
+    _cursor: Cursor, row: tuple[str, str, str, float, int]
+) -> MonthlyRating:
+    """Row factory that turns a raw result tuple into a `MonthlyRating`."""
+    year, month, time_class, average_rating, total_games = row
+    return MonthlyRating(
+        year=int(year),
+        month=int(month),
+        time_class=TimeClass(time_class),
+        average_rating=average_rating,
+        total_games=total_games,
     )
 
 
@@ -142,4 +176,41 @@ def get_most_played_openings(
         )
         cur.row_factory = _to_opening_record
         rows: list[OpeningRecord] = cur.fetchall()
+        return rows
+
+
+def get_monthly_ratings(db_path: Path, username: str) -> list[MonthlyRating]:
+    """Average a player's rating per month and time class, from rated games only.
+
+    The rating used is the player's own, from whichever side they played.
+    Only games already saved by `fetch` are counted; nothing is downloaded.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        username: Chess.com username, lowercased to match stored rows.
+
+    Returns:
+        One entry per month and time class the player has rated games in,
+        oldest month first, then time classes alphabetically. Display order is up to the
+        caller. Empty if the player has no rated games.
+    """
+    with get_connection(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                strftime('%Y', end_date) AS year,
+                strftime('%m', end_date) AS month,
+                time_class,
+                AVG(CASE WHEN colour = :white
+                    THEN white_rating ELSE black_rating END) AS average_rating,
+                COUNT(*) AS total_games FROM games
+            WHERE username = :username AND rated = TRUE
+            GROUP BY year, month, time_class
+            ORDER BY year ASC, month ASC, time_class ASC
+            """,
+            {"username": username, "white": Colour.WHITE},
+        )
+        cur.row_factory = _to_monthly_rating
+        rows: list[MonthlyRating] = cur.fetchall()
         return rows

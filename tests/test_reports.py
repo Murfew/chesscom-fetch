@@ -3,10 +3,12 @@ from pathlib import Path
 import pytest
 
 from chesscom_fetch.database import get_connection
-from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result
+from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result, TimeClass
 from chesscom_fetch.reports import (
+    MonthlyRating,
     OpeningRecord,
     Record,
+    get_monthly_ratings,
     get_most_played_openings,
     get_record,
 )
@@ -297,3 +299,213 @@ class TestGetMostPlayedOpenings:
         openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0].opening_family == FRENCH_DEFENSE
         assert openings[1].opening_family == CARO_KANN_DEFENSE
+
+
+class TestGetMonthlyRatings:
+    def test_averages_rating_per_month_and_time_class(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(white_rating=1200),
+                    build_fake_game_row(white_rating=1201),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == [
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200.5,
+                total_games=2,
+            )
+        ]
+
+    def test_uses_players_own_rating_for_each_colour(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        white_rating=1200, black_rating=400, colour=Colour.WHITE
+                    ),
+                    build_fake_game_row(
+                        white_rating=400, black_rating=1200, colour=Colour.BLACK
+                    ),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == [
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200,
+                total_games=2,
+            )
+        ]
+
+    def test_ignores_unrated_games(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(white_rating=1200, rated=True),
+                    build_fake_game_row(white_rating=400, rated=False),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == [
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200,
+                total_games=1,
+            )
+        ]
+
+    def test_returns_empty_when_only_unrated_games(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(white_rating=400, rated=False),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == []
+
+    def test_separates_same_month_in_different_years(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(white_rating=1200, end_date="2025-11-05"),
+                    build_fake_game_row(white_rating=1200, end_date="2026-11-05"),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == [
+            MonthlyRating(
+                year=2025,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200,
+                total_games=1,
+            ),
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200,
+                total_games=1,
+            ),
+        ]
+
+    def test_separates_time_classes_in_same_month(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(white_rating=1200, time_class=TimeClass.BLITZ),
+                    build_fake_game_row(white_rating=1200, time_class=TimeClass.RAPID),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == [
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.BLITZ,
+                average_rating=1200,
+                total_games=1,
+            ),
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200,
+                total_games=1,
+            ),
+        ]
+
+    def test_orders_by_month_then_time_class(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(
+                        white_rating=1200,
+                        time_class=TimeClass.BLITZ,
+                        end_date="2026-11-05",
+                    ),
+                    build_fake_game_row(
+                        white_rating=1200,
+                        time_class=TimeClass.BLITZ,
+                        end_date="2026-10-05",
+                    ),
+                    build_fake_game_row(
+                        white_rating=1200,
+                        time_class=TimeClass.RAPID,
+                        end_date="2026-11-05",
+                    ),
+                    build_fake_game_row(
+                        white_rating=1200,
+                        time_class=TimeClass.RAPID,
+                        end_date="2026-10-05",
+                    ),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert [(rating.month, rating.time_class) for rating in ratings] == [
+            (10, TimeClass.BLITZ),
+            (10, TimeClass.RAPID),
+            (11, TimeClass.BLITZ),
+            (11, TimeClass.RAPID),
+        ]
+
+    def test_counts_only_requested_player(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(white_rating=1200, username=USERNAME_ONE),
+                    build_fake_game_row(white_rating=1000, username=USERNAME_TWO),
+                ],
+            )
+
+        ratings = get_monthly_ratings(temp_db, USERNAME_ONE)
+        assert ratings == [
+            MonthlyRating(
+                year=2026,
+                month=11,
+                time_class=TimeClass.RAPID,
+                average_rating=1200,
+                total_games=1,
+            )
+        ]
