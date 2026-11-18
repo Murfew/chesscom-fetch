@@ -340,7 +340,7 @@ def print_rating_history(
             else:
                 row_values.extend(
                     (
-                        str(int(time_class_rating.average_rating)),
+                        str(round(time_class_rating.average_rating)),
                         str(time_class_rating.total_games),
                     )
                 )
