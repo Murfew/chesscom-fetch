@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from chesscom_fetch.converter import _opening_family_from_url
 from chesscom_fetch.database import get_connection
 from chesscom_fetch.domain import UNKNOWN_OPENING_FAMILY, Colour, Result, TimeClass
 from chesscom_fetch.reports import (
@@ -299,6 +300,31 @@ class TestGetMostPlayedOpenings:
         openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
         assert openings[0].opening_family == FRENCH_DEFENSE
         assert openings[1].opening_family == CARO_KANN_DEFENSE
+
+    def test_counts_variations_of_one_family_together(
+        self, temp_db: Path, build_fake_game_row: BuildFakeGameRow
+    ) -> None:
+        caro_kann_advance = _opening_family_from_url(
+            "https://www.chess.com/openings/Caro-Kann-Defense-Advance-Variation"
+        )
+        caro_kann_exchange = _opening_family_from_url(
+            "https://www.chess.com/openings/Caro-Kann-Defense-Exchange-Variation"
+        )
+
+        with get_connection(temp_db) as conn:
+            add_games(
+                conn,
+                [
+                    build_fake_game_row(opening_family=caro_kann_advance),
+                    build_fake_game_row(opening_family=caro_kann_exchange),
+                ],
+            )
+
+        openings = get_most_played_openings(temp_db, USERNAME_ONE, Colour.WHITE)
+        assert len(openings) == 1
+        assert openings[0] == OpeningRecord(
+            opening_family=CARO_KANN_DEFENSE, record=Record(wins=0, draws=0, losses=2)
+        )
 
 
 class TestGetMonthlyRatings:
